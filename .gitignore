@@ -1,0 +1,91 @@
+# Simulation files
+*.vcd
+*.wlf
+*.vhd
+*.cf
+*.bak
+*.vdo
+*.fsdb
+*.trn
+*.dsn
+*.log
+transcript
+
+# ModelSim generated files
+work/
+vsim.wlf
+*.ini
+wlf*
+
+# Quartus generated files
+db/
+incremental_db/
+output_files/
+simulation/
+*.qws
+*.qpf
+*.qsf
+*.rpt
+*.summary
+*.done
+*.smsg
+*.pin
+*.sof
+*.pof
+
+# ISE/Vivado generated files
+*.cache
+*.data
+*.xpr
+*.runs
+*.jou
+*.hw
+*.ip_user_files
+*.str
+*.zip
+*.xise
+*.gise
+*.xrpt
+*.ngc
+*.ngd
+*.ncd
+*.pad
+*.drc
+*.twx
+*.par
+*.html
+*.txt
+*.xwbt
+*.xmsgs
+_ngo/
+xst/
+*.bgn
+*.bit
+*.bld
+*.cmd_log
+*.lso
+*.ngr
+*.stx
+*.syr
+*.twr
+*.ucf
+*.xst
+xlnx_auto*
+_xmsgs/
+webtalk*
+
+# OS specific
+*.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor backup files
+*~
+*.swp
+*.swo
+.vscode/
+.idea/
+
+# Exceptions - files to include despite the above rules
+!Project Specification*.txt
+!README.md 
