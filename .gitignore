@@ -1,3 +1,8 @@
+# Build directories
+obj_dir/
+build/
+*.out
+
 # Simulation files
 *.vcd
 *.wlf
