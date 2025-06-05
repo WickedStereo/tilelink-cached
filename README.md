@@ -1,61 +1,101 @@
-# TileLink Inclusive Directory Coherence (TIDC) System
+# TIDC (TileLink to Directory Cache)
 
-This repository contains a Verilog implementation of a TileLink Inclusive Directory Coherence system, designed to provide cache coherence among four L1 caches and a unified L2 cache using the SiFive TileLink Cached (TL-C) protocol.
+This repository contains two variants of the TIDC design:
 
-## System Overview
+1. **Standard Variant**: Original parameterized design
+2. **Verilator Variant**: De-parameterized version optimized for Verilator simulation
 
-The TIDC system implements a directory-based cache coherence protocol using TileLink TL-C. It features:
-
-- **Inclusive Coherence Policy**: Any cache line present in an L1 cache must also be present in the L2 cache
-- **Directory-Based Coherence**: The L2 cache maintains a directory of L1 cache line states
-- **Multiple Transaction Support**: Each L1 can have multiple outstanding transactions 
-- **Protocol Compliance**: Follows the TileLink Cached (TL-C) protocol with five channels (A, B, C, D, E)
-
-## Directory Structure
+## Repository Structure
 
 ```
 TIDC/
-├── rtl/                  # All design files
-│   ├── tidc_params.vh    # Common parameters and definitions
-│   ├── tilelink_interfaces.v # TileLink channel interfaces
-│   ├── source_id_manager.v   # Transaction ID management
-│   ├── sink_id_manager.v     # Response ID management
-│   ├── l1_*.v            # L1 cache components
-│   ├── l2_*.v            # L2 cache components
-│   └── tidc_top.v        # Top-level system integration
-└── tb/                   # Testbenches
-    └── tidc_system_tb.v  # System-level testbench
+├── variants/
+│   ├── standard/           # Original parameterized version
+│   │   ├── rtl/           # RTL source files
+│   │   ├── tb/            # Testbenches
+│   │   └── Makefile       # Variant-specific Makefile
+│   └── verilator/         # De-parameterized verilator version
+│       ├── rtl/           # RTL source files
+│       ├── tb/            # Testbenches and C++ testbench
+│       └── Makefile       # Variant-specific Makefile
+├── common/                # Shared utilities (if any)
+├── docs/                  # Documentation
+├── Makefile              # Top-level Makefile for variant selection
+├── README.md
+└── .gitignore
 ```
 
-## Key Components
+## Quick Start
 
-### 1. Source/Sink ID Management
-- Each L1 TileLink Adapter has a Source ID Manager to allocate and deallocate transaction IDs
-- The L2 TileLink Adapter has a Sink ID Manager to track outstanding Grant messages
+### Building and Running Simulations
 
-### 2. Directory Structure
-- The directory is implemented as a direct-mapped structure for simplicity
-- Each entry tracks the global coherence state, L1 presence, and tip state vectors
+The top-level Makefile supports both variants. Use the `VARIANT` parameter to select which version to build:
 
-### 3. Request Arbitration
-- Round-robin arbitration among L1 requests with channel prioritization (C > A)
-- Ensures fairness while maintaining protocol deadlock freedom
+```bash
+# Build and run verilator variant (default)
+make
 
-### 4. Coherence State Machine
-- Implements the TL-C coherence protocol with NtoB, NtoT, BtoT state transitions
-- Handles probe chains for invalidation and downgrade operations
+# Build and run standard variant
+make VARIANT=standard
 
-## Building and Testing
+# Build and run verilator variant explicitly
+make VARIANT=verilator
 
-To build and run the testbench, you'll need a Verilog simulator such as Icarus Verilog, ModelSim, or VCS.
+# View waveforms for verilator variant
+make VARIANT=verilator waves
 
-Example command for Icarus Verilog:
+# Run lint check on standard variant
+make VARIANT=standard lint
 
+# Clean all variants
+make clean-all
+
+# Test both variants
+make test-all
+
+# List available variants
+make list-variants
 ```
-iverilog -I./rtl -o tidc_sim.out tb/tidc_system_tb.v rtl/*.v
-vvp tidc_sim.out
-```
 
-## License
+### Variant-Specific Details
 
-[Specify license information here] 
+#### Standard Variant
+- **Location**: `variants/standard/`
+- **Features**: Full parameterized design
+- **Simulation**: Standard Verilog simulator compatible
+- **Build**: `make VARIANT=standard sim`
+
+#### Verilator Variant
+- **Location**: `variants/verilator/`  
+- **Features**: De-parameterized for Verilator compatibility
+- **Simulation**: Verilator with C++ testbench
+- **Build**: `make VARIANT=verilator sim` or just `make`
+
+## Development Workflow
+
+### Working with Variants
+
+**Switching between variants**:
+   ```bash
+   # Work on verilator variant
+   cd variants/verilator
+   make sim
+   
+   # Work on standard variant  
+   cd variants/standard
+   make sim
+   ```
+**Testing both variants**:
+   ```bash
+   # Test all variants from root
+   make test-all
+   ```
+
+## Contributing
+
+When contributing:
+1. Determine which variant(s) your changes affect
+2. Make changes in the appropriate `variants/` directory
+3. Test using the variant-specific workflow
+4. Consider impact on other variants
+5. Update documentation if needed 
