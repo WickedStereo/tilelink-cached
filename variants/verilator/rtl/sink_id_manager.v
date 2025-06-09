@@ -68,8 +68,8 @@ module sink_id_manager (
         found = 1'b0;
         for (i = 1; i <= MAX_IDS; i = i + 1) begin
             // Calculate next ID with wraparound
-            if (!found && !sink_id_in_use[((next_free_id + i) % MAX_IDS)]) begin
-                next_free_id <= (next_free_id + i[3:0]) % MAX_IDS;
+            if (!found && !sink_id_in_use[((next_free_id + i[3:0]) % MAX_IDS)]) begin
+                next_free_id <= 4'(({28'b0, next_free_id} + {28'b0, i[3:0]}) % MAX_IDS);
                 found = 1'b1;
             end
         end

@@ -2,7 +2,7 @@
 obj_dir/
 build/
 *.out
-
+.cursorrules
 # Simulation files
 *.vcd
 *.wlf

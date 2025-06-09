@@ -170,9 +170,9 @@ module tidc_top (
     wire [1023:0]                                       l1_data_array;              // 4 * 256 bits
     wire [3:0]                                          l1_data_error_array;
     
-    wire [3:0]                                          l1_probe_req_valid_array;
-    wire [127:0]                                        l1_probe_req_addr_array;    // 4 * 32 bits
-    wire [11:0]                                         l1_probe_req_permissions_array; // 4 * 3 bits
+    wire [3:0]                                          l1_probe_req_valid_from_l2;
+    wire [127:0]                                        l1_probe_req_addr_from_l2;    // 4 * 32 bits
+    wire [11:0]                                         l1_probe_req_permissions_from_l2; // 4 * 3 bits
     
     wire [3:0]                                          l1_probe_ack_valid_array;
     wire [127:0]                                        l1_probe_ack_addr_array;    // 4 * 32 bits
@@ -191,9 +191,21 @@ module tidc_top (
     assign {l1_3_data, l1_2_data, l1_1_data, l1_0_data} = l1_data_array;
     assign {l1_3_data_error, l1_2_data_error, l1_1_data_error, l1_0_data_error} = l1_data_error_array;
     
-    assign {l1_3_probe_req_valid, l1_2_probe_req_valid, l1_1_probe_req_valid, l1_0_probe_req_valid} = l1_probe_req_valid_array;
-    assign {l1_3_probe_req_addr, l1_2_probe_req_addr, l1_1_probe_req_addr, l1_0_probe_req_addr} = l1_probe_req_addr_array;
-    assign {l1_3_probe_req_permissions, l1_2_probe_req_permissions, l1_1_probe_req_permissions, l1_0_probe_req_permissions} = l1_probe_req_permissions_array;
+    // Probe req signals are driven by L2 adapter and split to individual outputs
+    assign l1_0_probe_req_valid = l1_probe_req_valid_from_l2[0];
+    assign l1_1_probe_req_valid = l1_probe_req_valid_from_l2[1];
+    assign l1_2_probe_req_valid = l1_probe_req_valid_from_l2[2];
+    assign l1_3_probe_req_valid = l1_probe_req_valid_from_l2[3];
+    
+    assign l1_0_probe_req_addr = l1_probe_req_addr_from_l2[31:0];
+    assign l1_1_probe_req_addr = l1_probe_req_addr_from_l2[63:32];
+    assign l1_2_probe_req_addr = l1_probe_req_addr_from_l2[95:64];
+    assign l1_3_probe_req_addr = l1_probe_req_addr_from_l2[127:96];
+    
+    assign l1_0_probe_req_permissions = l1_probe_req_permissions_from_l2[2:0];
+    assign l1_1_probe_req_permissions = l1_probe_req_permissions_from_l2[5:3];
+    assign l1_2_probe_req_permissions = l1_probe_req_permissions_from_l2[8:6];
+    assign l1_3_probe_req_permissions = l1_probe_req_permissions_from_l2[11:9];
     
     assign l1_probe_ack_valid_array = {l1_3_probe_ack_valid, l1_2_probe_ack_valid, l1_1_probe_ack_valid, l1_0_probe_ack_valid};
     assign l1_probe_ack_addr_array = {l1_3_probe_ack_addr, l1_2_probe_ack_addr, l1_1_probe_ack_addr, l1_0_probe_ack_addr};
@@ -222,9 +234,9 @@ module tidc_top (
                 .data_to_l1_data(l1_data_array[i*256 +: 256]),
                 .data_to_l1_error(l1_data_error_array[i]),
                 
-                .probe_req_to_l1_valid(l1_probe_req_valid_array[i]),
-                .probe_req_to_l1_addr(l1_probe_req_addr_array[i*32 +: 32]),
-                .probe_req_to_l1_permissions(l1_probe_req_permissions_array[i*3 +: 3]),
+                .probe_req_to_l1_valid(l1_probe_req_valid_from_l2[i]),
+                .probe_req_to_l1_addr(l1_probe_req_addr_from_l2[i*32 +: 32]),
+                .probe_req_to_l1_permissions(l1_probe_req_permissions_from_l2[i*3 +: 3]),
                 
                 .probe_ack_from_l1_valid(l1_probe_ack_valid_array[i]),
                 .probe_ack_from_l1_addr(l1_probe_ack_addr_array[i*32 +: 32]),
@@ -283,6 +295,16 @@ module tidc_top (
     l2_tilelink_adapter l2_adapter (
         .clk(clk),
         .rst_n(rst_n),
+        
+        // Direct probe interfaces to L1 adapters
+        .l1_probe_req_valid(l1_probe_req_valid_from_l2),
+        .l1_probe_req_addr(l1_probe_req_addr_from_l2),
+        .l1_probe_req_permissions(l1_probe_req_permissions_from_l2),
+        
+        .l1_probe_ack_valid(l1_probe_ack_valid_array),
+        .l1_probe_ack_addr(l1_probe_ack_addr_array),
+        .l1_probe_ack_permissions(l1_probe_ack_permissions_array),
+        .l1_probe_ack_dirty_data(l1_probe_ack_dirty_data_array),
         
         // TileLink interface
         .a_valid(a_valid),

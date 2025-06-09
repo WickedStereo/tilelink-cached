@@ -443,6 +443,10 @@ module l1_tilelink_adapter (
                         dealloc_source_id <= d_source;
                     end
                 end
+                
+                default: begin
+                    // Invalid state - do nothing
+                end
             endcase
         end
     end
@@ -536,6 +540,11 @@ module l1_tilelink_adapter (
                     d_source == pending_source_id) begin
                     next_state = STATE_IDLE;
                 end
+            end
+            
+            default: begin
+                // Invalid state - return to idle
+                next_state = STATE_IDLE;
             end
         endcase
     end

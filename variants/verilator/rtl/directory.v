@@ -118,6 +118,8 @@ module directory (
                         lookup_state <= dir_states[get_index(req_addr)];
                         lookup_presence <= dir_presence[get_index(req_addr)];
                         lookup_tip_state <= dir_tip_state[get_index(req_addr)];
+                        $display("[DIR DEBUG] HIT addr=%h: state=%b, presence=%b, tip_state=%b", 
+                                 req_addr, dir_states[get_index(req_addr)], dir_presence[get_index(req_addr)], dir_tip_state[get_index(req_addr)]);
                     end
                     else begin
                         // Directory miss (entry not present)
@@ -125,6 +127,7 @@ module directory (
                         lookup_state <= DIR_STATE_INVALID;
                         lookup_presence <= 4'b0;
                         lookup_tip_state <= 4'b0;
+                        $display("[DIR DEBUG] MISS addr=%h: returning INVALID", req_addr);
                     end
                 end
                 
@@ -136,8 +139,15 @@ module directory (
                     dir_presence[get_index(req_addr)] <= update_presence;
                     dir_tip_state[get_index(req_addr)] <= update_tip_state;
                     
+                    $display("[DIR DEBUG] UPDATE addr=%h: state=%b, presence=%b, tip_state=%b", 
+                             req_addr, update_state, update_presence, update_tip_state);
+                    
                     // Signal update completion
                     update_done <= 1'b1;
+                end
+                
+                default: begin
+                    // Invalid state - do nothing, stay in current state
                 end
             endcase
         end
@@ -163,6 +173,11 @@ module directory (
             end
             
             STATE_UPDATE: begin
+                next_state = STATE_IDLE;
+            end
+            
+            default: begin
+                // Invalid state - return to IDLE
                 next_state = STATE_IDLE;
             end
         endcase

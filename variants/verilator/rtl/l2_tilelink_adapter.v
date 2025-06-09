@@ -11,6 +11,16 @@ module l2_tilelink_adapter (
     input  wire                         clk,
     input  wire                         rst_n,
     
+    // Direct probe interfaces to L1 adapters
+    output wire [3:0]                   l1_probe_req_valid,
+    output wire [127:0]                 l1_probe_req_addr,     // 4 * 32 bits
+    output wire [11:0]                  l1_probe_req_permissions, // 4 * 3 bits
+    
+    input  wire [3:0]                   l1_probe_ack_valid,
+    input  wire [127:0]                 l1_probe_ack_addr,     // 4 * 32 bits
+    input  wire [11:0]                  l1_probe_ack_permissions, // 4 * 3 bits
+    input  wire [1023:0]                l1_probe_ack_dirty_data, // 4 * 256 bits
+    
     // TileLink Channel A (requests from L1s)
     input  wire [3:0]                   a_valid,
     input  wire [11:0]                  a_opcode,  // Packed array of opcodes from each master (4*3)
@@ -131,9 +141,20 @@ module l2_tilelink_adapter (
     reg [3:0]                  pending_sink;
     reg [255:0]                pending_data;
     
+    // Latched directory lookup results
+    reg                        dir_result_valid;
+    reg [2:0]                  dir_result_state;
+    reg [3:0]                  dir_result_presence;
+    reg [3:0]                  dir_result_tip_state;
+    
     // Probe response tracking
     reg [3:0]                  probe_sent;      // Bit vector of L1s that were probed
     reg [3:0]                  probe_acked;     // Bit vector of L1s that have responded
+    
+    // L2 response buffering
+    reg                        l2_response_buffered;
+    reg [255:0]                l2_response_data_buf;
+    reg                        l2_response_error_buf;
     
     // Integer variables for loops
     integer i, j;
@@ -186,9 +207,20 @@ module l2_tilelink_adapter (
     );
     
     // Control logic for Sink ID allocation
-    assign sink_id_alloc_req = (state == STATE_GRANT_SEND) && !d_valid[pending_master_id] && l2_response_valid;
+    assign sink_id_alloc_req = (state == STATE_GRANT_SEND) && !d_valid[pending_master_id] && (l2_response_valid || l2_response_buffered);
     assign sink_id_dealloc_req = (state == STATE_GRANTACK_WAIT) && e_valid[pending_master_id] && 
                                (e_sink[pending_master_id*4 +: 4] == pending_sink);
+
+    // Probe signal generation
+    genvar k;
+    generate
+        for (k = 0; k < 4; k = k + 1) begin : gen_probe_signals
+            assign l1_probe_req_valid[k] = (state == STATE_PROBE_SEND) && probe_sent[k] && !probe_acked[k];
+            assign l1_probe_req_addr[k*32 +: 32] = (l1_probe_req_valid[k]) ? pending_addr : 32'b0;
+            assign l1_probe_req_permissions[k*3 +: 3] = (l1_probe_req_valid[k]) ? 
+                ((pending_param == PARAM_NtoT || pending_param == PARAM_BtoT) ? PARAM_toN : PARAM_toB) : 3'b0;
+        end
+    endgenerate
     
     // Connect to arbiter - ready when we can accept a new request
     // Always ready to avoid circular dependency - L2 adapter will handle queuing internally if needed
@@ -196,6 +228,17 @@ module l2_tilelink_adapter (
     
     // Grant ready signal on Channel E (always ready to accept GrantAcks)
     assign e_ready = 4'b1111;
+    
+    // Debug state transitions
+    reg [3:0] prev_state;
+    always @(posedge clk) begin
+        if (rst_n && prev_state != state) begin
+            $display("[L2 DEBUG] State transition: %d -> %d", prev_state, state);
+            prev_state <= state;
+        end else if (!rst_n) begin
+            prev_state <= STATE_IDLE;
+        end
+    end
     
     // Sequential logic
     always @(posedge clk or negedge rst_n) begin
@@ -215,6 +258,19 @@ module l2_tilelink_adapter (
             // Reset probe tracking
             probe_sent <= 4'b0;
             probe_acked <= 4'b0;
+            
+            // Reset latched directory results
+            dir_result_valid <= 1'b0;
+            dir_result_state <= 3'b000;
+            dir_result_presence <= 4'b0;
+            dir_result_tip_state <= 4'b0;
+            
+            // Reset L2 response buffering
+            l2_response_buffered <= 1'b0;
+            l2_response_data_buf <= 256'b0;
+            l2_response_error_buf <= 1'b0;
+            
+            // Probe interfaces are continuous assignments
             
             // Reset directory interface
             dir_lookup_req <= 1'b0;
@@ -265,6 +321,30 @@ module l2_tilelink_adapter (
             // State machine transitions
             state <= next_state;
             
+            // Latch directory lookup results when they become valid
+            if (dir_lookup_valid) begin
+                dir_result_valid <= 1'b1;
+                dir_result_state <= dir_lookup_state;
+                dir_result_presence <= dir_lookup_presence;
+                dir_result_tip_state <= dir_lookup_tip_state;
+            end else if (state == STATE_ACQUIRE_PROCESS) begin
+                // Clear latched results after processing
+                dir_result_valid <= 1'b0;
+            end
+            
+            // Buffer L2 response when it arrives during L2_ACCESS state
+            if (state == STATE_L2_ACCESS && l2_response_valid && !l2_response_buffered) begin
+                l2_response_buffered <= 1'b1;
+                l2_response_data_buf <= l2_response_data;
+                l2_response_error_buf <= l2_response_error;
+                $display("[L2 DEBUG] Buffering L2 response: data=%h", l2_response_data[63:0]);
+            end
+            // Clear buffer when returning to IDLE
+            else if (next_state == STATE_IDLE) begin
+                l2_response_buffered <= 1'b0;
+                $display("[L2 DEBUG] Clearing L2 response buffer");
+            end
+            
             // State-specific actions
             case (state)
                 STATE_IDLE: begin
@@ -301,64 +381,57 @@ module l2_tilelink_adapter (
                 
                 STATE_ACQUIRE_PROCESS: begin
                     // Process Acquire request based on directory state and requested permissions
-                    if (dir_lookup_valid) begin
+                    $display("[L2 DEBUG] ACQUIRE_PROCESS entered: dir_result_valid=%b", dir_result_valid);
+                    if (dir_result_valid) begin
+                        // Debug output for probe logic
+                        $display("[L2 DEBUG] ACQUIRE_PROCESS: addr=%h, param=%b, dir_state=%b, dir_presence=%b, master_id=%d", 
+                                 pending_addr, pending_param, dir_result_state, dir_result_presence, pending_master_id);
+                        
                         // Determine which L1s need to be probed based on requested permissions
                         if (pending_param == PARAM_NtoT || pending_param == PARAM_BtoT) begin
                             // Exclusive access requested - need to invalidate/downgrade all sharers
-                            if (dir_lookup_state == DIR_STATE_SHARED || dir_lookup_state == DIR_STATE_EXCLUSIVE) begin
+                            if (dir_result_state == DIR_STATE_SHARED || dir_result_state == DIR_STATE_EXCLUSIVE) begin
                                 // There are sharers that need to be probed
-                                probe_sent <= dir_lookup_presence & ~(1 << pending_master_id); // Don't probe requesting L1
+                                probe_sent <= dir_result_presence & ~(1 << pending_master_id); // Don't probe requesting L1
                                 probe_acked <= 4'b0;
+                                $display("[L2 DEBUG] Setting probe_sent=%b (presence=%b, exclude_master=%b)", 
+                                         dir_result_presence & ~(1 << pending_master_id), dir_result_presence, 1 << pending_master_id);
                             end
                             else begin
                                 // No sharers, can proceed directly to L2 access
                                 probe_sent <= 4'b0;
                                 probe_acked <= 4'b0;
+                                $display("[L2 DEBUG] No probes needed, dir_state=%b", dir_result_state);
                             end
                         end
                         else begin // NtoB - shared access
                             // No probes needed for shared access
                             probe_sent <= 4'b0;
                             probe_acked <= 4'b0;
+                            $display("[L2 DEBUG] Shared access, no probes needed");
                         end
                     end
                 end
                 
                 STATE_PROBE_SEND: begin
-                    // Send probes to L1s that have the cache line
-                    for (i = 0; i < 4; i = i + 1) begin
-                        if (probe_sent[i] && !probe_acked[i]) begin
-                            // Send probe to this L1
-                            b_valid[i] <= 1'b1;
-                            b_opcode[i*3 +: 3] <= B_OPCODE_PROBE_BLOCK;
-                            b_param[i*3 +: 3] <= (pending_param == PARAM_NtoT || pending_param == PARAM_BtoT) ? 
-                                                  PARAM_toN : PARAM_toB; // Invalidate for exclusive, downgrade for shared
-                            b_size[i*4 +: 4] <= 4'($clog2(256/8));
-                            b_source[i*4 +: 4] <= pending_source;
-                            b_address[i*32 +: 32] <= pending_addr;
-                            b_data[i*64 +: 64] <= 64'b0;
-                            b_mask[i*8 +: 8] <= 8'b11111111;
-                        end
-                    end
+                    // Probe sending is now handled by continuous assignments
                 end
                 
                 STATE_PROBE_WAIT: begin
-                    // Check for incoming ProbeAck messages on Channel C
+                    // Check for incoming probe acknowledgments from L1 adapters
                     for (j = 0; j < 4; j = j + 1) begin
-                        if (c_valid[j] && (c_opcode[j*3 +: 3] == C_OPCODE_PROBE_ACK || 
-                                          c_opcode[j*3 +: 3] == C_OPCODE_PROBE_ACK_DATA) &&
-                            c_address[j*32 +: 32] == pending_addr && probe_sent[j]) begin
-                            
+                        if (l1_probe_ack_valid[j] && l1_probe_ack_addr[j*32 +: 32] == pending_addr && probe_sent[j]) begin
                             // Mark this L1 as having responded
                             probe_acked[j] <= 1'b1;
                             
-                            // If ProbeAckData, write the data to L2 cache
-                            if (c_opcode[j*3 +: 3] == C_OPCODE_PROBE_ACK_DATA) begin
+                            // If probe ack indicates dirty data, write it to L2 cache
+                            if (l1_probe_ack_permissions[j*3 +: 3] == PARAM_TtoN || 
+                                l1_probe_ack_permissions[j*3 +: 3] == PARAM_TtoB) begin
                                 l2_cmd_valid <= 1'b1;
                                 l2_cmd_type <= L2_CMD_WRITE_BACK;
                                 l2_cmd_addr <= pending_addr;
-                                l2_cmd_data <= {{(256-64){1'b0}}, c_data[j*64 +: 64]};
-                                l2_cmd_size <= $clog2(256/8);
+                                l2_cmd_data <= l1_probe_ack_dirty_data[j*256 +: 256];
+                                l2_cmd_size <= 4'($clog2(256/8));
                                 l2_cmd_dirty <= 1'b1;
                             end
                         end
@@ -372,24 +445,29 @@ module l2_tilelink_adapter (
                         l2_cmd_type <= L2_CMD_READ;
                         l2_cmd_addr <= pending_addr;
                         l2_cmd_data <= 256'b0;
-                        l2_cmd_size <= $clog2(256/8);
+                        l2_cmd_size <= 4'($clog2(256/8));
                         l2_cmd_dirty <= 1'b0;
                     end
                 end
                 
                 STATE_GRANT_SEND: begin
-                    // Send Grant/GrantData to the requesting L1
-                    if (l2_response_valid && sink_id_alloc_gnt) begin
+                    // Send Grant/GrantData to the requesting L1 - only if not already sent
+                    $display("[L2 DEBUG] GRANT_SEND: master_id=%d, l2_valid=%b, buffered=%b, sink_gnt=%b, d_valid=%b", 
+                             pending_master_id, l2_response_valid, l2_response_buffered, sink_id_alloc_gnt, d_valid[pending_master_id]);
+                    if ((l2_response_valid || l2_response_buffered) && sink_id_alloc_gnt && !d_valid[pending_master_id]) begin
                         pending_sink <= sink_id_alloc_sink_id;
                         
                         d_valid[pending_master_id] <= 1'b1;
                         d_opcode[pending_master_id*3 +: 3] <= D_OPCODE_GRANT_DATA;
                         d_param[pending_master_id*3 +: 3] <= pending_param; // Grant the requested permissions
-                        d_size[pending_master_id*4 +: 4] <= $clog2(256/8);
+                        d_size[pending_master_id*4 +: 4] <= 4'($clog2(256/8));
                         d_source[pending_master_id*4 +: 4] <= pending_source;
                         d_sink[pending_master_id*4 +: 4] <= sink_id_alloc_sink_id;
-                        d_data[pending_master_id*64 +: 64] <= l2_response_data[63:0];
-                        d_error[pending_master_id] <= l2_response_error;
+                        // Use buffered data if available, otherwise direct L2 response
+                        d_data[pending_master_id*64 +: 64] <= l2_response_buffered ? l2_response_data_buf[63:0] : l2_response_data[63:0];
+                        d_error[pending_master_id] <= l2_response_buffered ? l2_response_error_buf : l2_response_error;
+                        $display("[L2 DEBUG] Grant sent to L1_%d: data=%h", pending_master_id, 
+                                 l2_response_buffered ? l2_response_data_buf[63:0] : l2_response_data[63:0]);
                     end
                 end
                 
@@ -401,7 +479,7 @@ module l2_tilelink_adapter (
                         l2_cmd_type <= L2_CMD_WRITE_BACK;
                         l2_cmd_addr <= pending_addr;
                         l2_cmd_data <= pending_data;
-                        l2_cmd_size <= $clog2(256/8);
+                        l2_cmd_size <= 4'($clog2(256/8));
                         l2_cmd_dirty <= 1'b1;
                     end
                     
@@ -433,7 +511,7 @@ module l2_tilelink_adapter (
                     d_valid[pending_master_id] <= 1'b1;
                     d_opcode[pending_master_id*3 +: 3] <= D_OPCODE_RELEASE_ACK;
                     d_param[pending_master_id*3 +: 3] <= 3'b000;
-                    d_size[pending_master_id*4 +: 4] <= $clog2(256/8);
+                    d_size[pending_master_id*4 +: 4] <= 4'($clog2(256/8));
                     d_source[pending_master_id*4 +: 4] <= pending_source;
                     d_sink[pending_master_id*4 +: 4] <= {4{1'b0}};
                     d_data[pending_master_id*64 +: 64] <= {64{1'b0}};
@@ -474,7 +552,7 @@ module l2_tilelink_adapter (
                         l2_cmd_type <= L2_CMD_READ;
                         l2_cmd_addr <= pending_addr;
                         l2_cmd_data <= {256{1'b0}};
-                        l2_cmd_size <= $clog2(256/8);
+                        l2_cmd_size <= 4'($clog2(256/8));
                         l2_cmd_dirty <= 1'b0;
                     end
                     else if (pending_opcode == A_OPCODE_PUT_FULL_DATA) begin
@@ -483,19 +561,23 @@ module l2_tilelink_adapter (
                         l2_cmd_type <= L2_CMD_WRITE;
                         l2_cmd_addr <= pending_addr;
                         l2_cmd_data <= pending_data;
-                        l2_cmd_size <= $clog2(256/8);
+                        l2_cmd_size <= 4'($clog2(256/8));
                         l2_cmd_dirty <= 1'b1;
                         
                         // Send immediate AccessAck for writes
                         d_valid[pending_master_id] <= 1'b1;
                         d_opcode[pending_master_id*3 +: 3] <= D_OPCODE_ACCESS_ACK;
                         d_param[pending_master_id*3 +: 3] <= 3'b000;
-                        d_size[pending_master_id*4 +: 4] <= $clog2(256/8);
+                        d_size[pending_master_id*4 +: 4] <= 4'($clog2(256/8));
                         d_source[pending_master_id*4 +: 4] <= pending_source;
                         d_sink[pending_master_id*4 +: 4] <= {4{1'b0}};
                         d_data[pending_master_id*64 +: 64] <= {64{1'b0}};
                         d_error[pending_master_id] <= l2_response_error;
                     end
+                end
+                
+                default: begin
+                    // Invalid state - do nothing
                 end
             endcase
         end
@@ -515,24 +597,34 @@ module l2_tilelink_adapter (
             
             STATE_DIR_LOOKUP: begin
                 if (dir_lookup_valid) begin
+                    $display("[L2 DEBUG] DIR_LOOKUP complete: opcode=%b, expected_ACQUIRE=%b", 
+                             pending_opcode, A_OPCODE_ACQUIRE_BLOCK);
                     // Determine next state based on request type
                     if (pending_opcode == A_OPCODE_ACQUIRE_BLOCK) begin
                         next_state = STATE_ACQUIRE_PROCESS;
+                        $display("[L2 DEBUG] Going to ACQUIRE_PROCESS");
                     end
                     else if (pending_opcode == C_OPCODE_RELEASE || pending_opcode == C_OPCODE_RELEASE_DATA) begin
                         next_state = STATE_RELEASE_PROCESS;
+                        $display("[L2 DEBUG] Going to RELEASE_PROCESS");
                     end
                     else if (pending_opcode == A_OPCODE_GET || pending_opcode == A_OPCODE_PUT_FULL_DATA) begin
                         next_state = STATE_UNCACHED_PROCESS;
+                        $display("[L2 DEBUG] Going to UNCACHED_PROCESS");
                     end
                     else begin
                         next_state = STATE_IDLE; // Unknown opcode
+                        $display("[L2 DEBUG] Unknown opcode, going to IDLE");
                     end
                 end
             end
             
             STATE_ACQUIRE_PROCESS: begin
-                if (|probe_sent) begin
+                // Check if probes are needed based on directory state
+                if (dir_result_valid && 
+                    (pending_param == PARAM_NtoT || pending_param == PARAM_BtoT) &&
+                    (dir_result_state == DIR_STATE_SHARED || dir_result_state == DIR_STATE_EXCLUSIVE) &&
+                    |(dir_result_presence & ~(1 << pending_master_id))) begin
                     next_state = STATE_PROBE_SEND;
                 end
                 else begin
@@ -541,8 +633,14 @@ module l2_tilelink_adapter (
             end
             
             STATE_PROBE_SEND: begin
-                // Move to wait state after sending probes
-                next_state = STATE_PROBE_WAIT;
+                // Check if all required probes have been sent (valid && ready handshake)
+                if (probe_sent == 4'b0000) begin
+                    // No probes needed, go directly to L2 access
+                    next_state = STATE_L2_ACCESS;
+                end else begin
+                    // Stay in PROBE_SEND until all probes are successfully sent
+                    next_state = STATE_PROBE_WAIT;
+                end
             end
             
             STATE_PROBE_WAIT: begin
@@ -559,8 +657,11 @@ module l2_tilelink_adapter (
             end
             
             STATE_GRANT_SEND: begin
+                $display("[L2 DEBUG] GRANT_SEND next: d_valid[%d]=%b, d_ready[%d]=%b", 
+                         pending_master_id, d_valid[pending_master_id], pending_master_id, d_ready[pending_master_id]);
                 if (d_valid[pending_master_id] && d_ready[pending_master_id]) begin
                     next_state = STATE_GRANTACK_WAIT;
+                    $display("[L2 DEBUG] Going to GRANTACK_WAIT");
                 end
             end
             
@@ -592,6 +693,11 @@ module l2_tilelink_adapter (
                     // AccessAck already sent for uncached write
                     next_state = STATE_IDLE;
                 end
+            end
+            
+            default: begin
+                // Invalid state - return to idle
+                next_state = STATE_IDLE;
             end
         endcase
     end

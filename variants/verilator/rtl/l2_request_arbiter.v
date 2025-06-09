@@ -84,10 +84,14 @@ module l2_request_arbiter (
         genvar i;
         for (i = 0; i < 4; i = i + 1) begin : gen_masked_reqs
             // For Channel A
+            /* verilator lint_off CMPCONST */
             assign a_req_masked[i] = a_req_pending[i] && (i >= a_rr_ptr);
+            /* verilator lint_on CMPCONST */
             
             // For Channel C
+            /* verilator lint_off CMPCONST */
             assign c_req_masked[i] = c_req_pending[i] && (i >= c_rr_ptr);
+            /* verilator lint_on CMPCONST */
         end
     endgenerate
     
@@ -164,11 +168,11 @@ module l2_request_arbiter (
                     if (arb_ready) begin
                         if (arb_channel == CHANNEL_A) begin
                             // Update Channel A round-robin pointer for fairness
-                            a_rr_ptr <= (a_selected_id + 1) % 4;
+                            a_rr_ptr <= (a_selected_id + 2'b01) == 2'b11 ? 2'b00 : (a_selected_id + 2'b01);
                         end
                         else begin
                             // Update Channel C round-robin pointer for fairness
-                            c_rr_ptr <= (c_selected_id + 1) % 4;
+                            c_rr_ptr <= (c_selected_id + 2'b01) == 2'b11 ? 2'b00 : (c_selected_id + 2'b01);
                         end
                     end
                 end
@@ -176,6 +180,11 @@ module l2_request_arbiter (
                 STATE_WAIT: begin
                     // Wait state - keep busy signal asserted
                     arb_busy <= 1'b1;
+                end
+                
+                default: begin
+                    // Invalid state - reset to idle
+                    arb_busy <= 1'b0;
                 end
             endcase
         end
@@ -220,6 +229,11 @@ module l2_request_arbiter (
                         next_state = STATE_IDLE;
                     end
                 end
+            end
+            
+            default: begin
+                // Invalid state - return to idle
+                next_state = STATE_IDLE;
             end
         endcase
     end
