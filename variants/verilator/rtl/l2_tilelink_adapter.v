@@ -231,12 +231,12 @@ module l2_tilelink_adapter (
     
     // Debug state transitions
     reg [3:0] prev_state;
-    always @(posedge clk) begin
-        if (rst_n && prev_state != state) begin
+    always @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin
+            prev_state <= STATE_IDLE;
+        end else if (prev_state != state) begin
             $display("[L2 DEBUG] State transition: %d -> %d", prev_state, state);
             prev_state <= state;
-        end else if (!rst_n) begin
-            prev_state <= STATE_IDLE;
         end
     end
     
