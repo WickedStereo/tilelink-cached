@@ -28,10 +28,10 @@ module l1_tilelink_adapter (
     output reg  [255:0]                 data_to_l1_data,
     output reg                          data_to_l1_error,
     
-    // L1 Cache Controller Interface - probe requests to L1
-    output reg                          probe_req_to_l1_valid,
-    output reg  [31:0]                  probe_req_to_l1_addr,
-    output reg  [2:0]                   probe_req_to_l1_permissions, // toN, toB, toT
+    // L1 Cache Controller Interface - probe requests to L1 (INPUTS - L1 receives probes)
+    input  wire                         probe_req_to_l1_valid,
+    input  wire [31:0]                  probe_req_to_l1_addr,
+    input  wire [2:0]                   probe_req_to_l1_permissions, // toN, toB, toT
     
     // L1 Cache Controller Interface - probe acknowledgements from L1
     input  wire                         probe_ack_from_l1_valid,
@@ -207,10 +207,6 @@ module l1_tilelink_adapter (
             data_to_l1_data <= 256'b0;
             data_to_l1_error <= 1'b0;
             
-            probe_req_to_l1_valid <= 1'b0;
-            probe_req_to_l1_addr <= 32'b0;
-            probe_req_to_l1_permissions <= 3'b000;
-            
             // Reset TileLink A channel outputs
             a_valid <= 1'b0;
             a_opcode <= 3'b000;
@@ -251,7 +247,7 @@ module l1_tilelink_adapter (
             e_valid <= 1'b0;
             
             data_to_l1_valid <= 1'b0;
-            probe_req_to_l1_valid <= 1'b0;
+            // Note: probe_req_to_l1_valid is now an input, not driven here
             
             // Always ready to receive responses on D channel
             d_ready <= 1'b1;
@@ -351,15 +347,13 @@ module l1_tilelink_adapter (
                 STATE_PROBE_PROCESS: begin
                     // Process a probe from L2
                     if (b_valid && b_opcode == B_OPCODE_PROBE_BLOCK) begin
-                        // Save probe details
+                        // Save probe details for response
                         probe_addr <= b_address;
                         probe_param <= b_param;
                         probe_source <= b_source;
                         
-                        // Forward probe to L1 cache
-                        probe_req_to_l1_valid <= 1'b1;
-                        probe_req_to_l1_addr <= b_address;
-                        probe_req_to_l1_permissions <= b_param; // toN, toB, toT
+                        // The probe request is now forwarded directly to L1 via external connections
+                        // No need to drive probe_req_to_l1_* signals here
                     end
                 end
                 

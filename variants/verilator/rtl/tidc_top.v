@@ -191,7 +191,11 @@ module tidc_top (
     assign {l1_3_data, l1_2_data, l1_1_data, l1_0_data} = l1_data_array;
     assign {l1_3_data_error, l1_2_data_error, l1_1_data_error, l1_0_data_error} = l1_data_error_array;
     
-    // Probe req signals are driven by L2 adapter and split to individual outputs
+    // Probe req signals are driven directly through L1 adapter array connections
+    // Individual probe signal assignments removed to avoid MULTIDRIVEN errors
+    // The L1 adapters connect directly to the array signals from L2 adapter
+    
+    // Connect internal array signals to individual output ports (no conflict since L1 adapters don't drive these)
     assign l1_0_probe_req_valid = l1_probe_req_valid_from_l2[0];
     assign l1_1_probe_req_valid = l1_probe_req_valid_from_l2[1];
     assign l1_2_probe_req_valid = l1_probe_req_valid_from_l2[2];
