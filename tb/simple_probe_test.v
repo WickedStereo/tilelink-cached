@@ -100,29 +100,6 @@ module simple_probe_test (
         .l1_1_probe_ack_permissions(l1_1_probe_ack_permissions),
         .l1_1_probe_ack_dirty_data(l1_1_probe_ack_dirty_data),
         
-        // Tie off unused L1 interfaces
-        .l1_2_request_valid(1'b0),
-        .l1_2_request_addr(32'b0),
-        .l1_2_request_type(3'b0),
-        .l1_2_request_data(256'b0),
-        .l1_2_request_permissions(3'b0),
-        // Outputs not connected for unused L1_2
-        .l1_2_probe_ack_valid(1'b0),
-        .l1_2_probe_ack_addr(32'b0),
-        .l1_2_probe_ack_permissions(3'b0),
-        .l1_2_probe_ack_dirty_data(256'b0),
-        
-        .l1_3_request_valid(1'b0),
-        .l1_3_request_addr(32'b0),
-        .l1_3_request_type(3'b0),
-        .l1_3_request_data(256'b0),
-        .l1_3_request_permissions(3'b0),
-        // Outputs not connected for unused L1_3
-        .l1_3_probe_ack_valid(1'b0),
-        .l1_3_probe_ack_addr(32'b0),
-        .l1_3_probe_ack_permissions(3'b0),
-        .l1_3_probe_ack_dirty_data(256'b0),
-        
         // L2 interface
         .l2_cmd_valid(l2_cmd_valid),
         .l2_cmd_type(l2_cmd_type),

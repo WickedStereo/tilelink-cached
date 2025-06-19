@@ -1,120 +1,104 @@
-# TIDC (TileLink to Directory Cache)
+# TIDC (TileLink to Directory Cache) - 2-Master System
 
-This repository contains two variants of the TIDC design:
+A directory-based cache coherence system implementing TileLink protocol for 2 L1 cache masters, optimized for 64-bit systems.
 
-1. **Standard Variant**: Original parameterized design
-2. **Verilator Variant**: De-parameterized version optimized for Verilator simulation
+## Overview
+
+TIDC provides directory-based coherence for a 2-L1 cache system using the TileLink protocol. The design is optimized for Verilator simulation with hard-coded array sizes and simplified test infrastructure.
 
 ## Repository Structure
 
 ```
 TIDC/
-├── variants/
-│   ├── standard/           # Original parameterized version
-│   │   ├── rtl/           # RTL source files
-│   │   ├── tb/            # Testbenches
-│   │   └── Makefile       # Variant-specific Makefile
-│   └── verilator/         # De-parameterized verilator version
-│       ├── rtl/           # RTL source files
-│       ├── tb/            # Testbenches and C++ testbench
-│       └── Makefile       # Variant-specific Makefile
-├── common/                # Shared utilities (if any)
-├── docs/                  # Documentation
-├── Makefile              # Top-level Makefile for variant selection
+├── rtl/                   # RTL source files
+│   ├── tidc_top.v        # Top module (2 L1 interfaces)
+│   ├── directory.v       # Directory coherence engine
+│   ├── l2_tilelink_adapter.v # L2 TileLink adapter
+│   └── tidc_params.v     # System parameters
+├── tb/                   # Testbenches
+│   ├── simple_probe_test.v # Basic 2-L1 probe test
+│   └── two_master_test.v   # Complete 2-L1 test
+├── cpp/                  # Verilator C++ drivers
+│   ├── main_simple_probe.cpp
+│   └── main_two_master.cpp
+├── Makefile             # Build system
 ├── README.md
 └── .gitignore
 ```
 
 ## Quick Start
 
-### Building and Running Simulations
-
-The top-level Makefile supports both variants. Use the `VARIANT` parameter to select which version to build:
+### Building and Running Tests
 
 ```bash
-# Build and run verilator variant (default)
+# Run the main 2-master test (default)
 make
 
-# Build and run standard variant
-make VARIANT=standard
+# Run specific tests
+make two-master-test        # Complete 2-L1 coherence test
+make simple-probe-test      # Basic probe mechanism test
 
-# Build and run verilator variant explicitly
-make VARIANT=verilator
+# View waveforms
+make waves                  # Opens GTKWave with simple probe test
 
-# View waveforms for verilator variant
-make VARIANT=verilator waves
+# Clean build files
+make clean
 
-# Run lint check on standard variant
-make VARIANT=standard lint
-
-# Clean all variants
-make clean-all
-
-# Test both variants
-make test-all
-
-# List available variants
-make list-variants
+# Lint check
+make lint
 ```
 
-### Variant-Specific Details
+### Test Descriptions
 
-#### Standard Variant
-- **Location**: `variants/standard/`
-- **Features**: Full parameterized design
-- **Simulation**: Standard Verilog simulator compatible
-- **Build**: `make VARIANT=standard sim`
+- **`simple_probe_test`**: Basic 2-L1 scenario testing probe mechanism
+  - L1_0 gets shared access → L1_1 gets shared access → L1_0 upgrades to exclusive (probes L1_1)
+  
+- **`two_master_test`**: Complete 2-L1 coherence validation
+  - Tests multiple coherence scenarios with 2 L1 caches
+  - Validates directory state transitions and probe responses
 
-#### Verilator Variant
-- **Location**: `variants/verilator/`  
-- **Features**: De-parameterized for Verilator compatibility
-- **Simulation**: Verilator with C++ testbench
-- **Build**: `make VARIANT=verilator sim` or just `make`
+## System Architecture
 
-## Development Workflow
+### Core Components
 
-### Working with Variants
+- **`tidc_top.v`**: Top-level module with 2 L1 interfaces
+- **`directory.v`**: Directory coherence controller with presence tracking
+- **`l2_tilelink_adapter.v`**: Main state machine handling L1-L2 coordination
+- **`sink_id_manager.v`**: TileLink sink ID management
+- **`source_id_manager.v`**: TileLink source ID management
 
-**Switching between variants**:
-   ```bash
-   # Work on verilator variant
-   cd variants/verilator
-   make sim
-   
-   # Work on standard variant  
-   cd variants/standard
-   make sim
-   ```
-**Testing both variants**:
-   ```bash
-   # Test all variants from root
-   make test-all
-   ```
+### Key Features
 
-## Status
+- **2-L1 Cache Support**: Designed specifically for dual L1 cache configuration
+- **Directory Coherence**: MESI-style coherence with directory presence tracking
+- **TileLink Protocol**: Full TileLink implementation for cache coherence
+- **Verilator Optimized**: Hard-coded array sizes for fast simulation
+- **64-bit System**: Optimized for 64-bit addresses and 64-byte cache lines
+- **Probe Mechanism**: Sophisticated L1 cache probing for coherence maintenance
 
-**Current Status: PRODUCTION READY** for multi-L1 cache coherence scenarios.
+## Design Specifications
 
-### **✅ Verilator Variant** (`variants/verilator/`)
-- **Multi-L1 Coherence**: ✅ Production ready with 4-L1 validation
-- **Probe Mechanism**: ✅ Sophisticated multi-probe generation working 
-- **Test Coverage**: ✅ Comprehensive test suite with 3 scenarios
-- **Performance**: ✅ ≤300 cycle multi-probe completion validated
+- **L1 Caches**: 2 masters supported
+- **Cache Line Size**: 512 bits (64 bytes)
+- **Address Width**: 64 bits
+- **Data Width**: 512 bits
+- **Protocol**: TileLink with MESI coherence
+- **Simulation**: Verilator with C++ testbench drivers
 
-**Quick Start**: `cd variants/verilator && make multi-sharer-test`
+## Development
 
-### **📋 Key Documentation**
-- `TIDC_COMPREHENSIVE_TODO.md` - Complete task tracking and next steps
-- `variants/verilator/ADVANCED_TESTING_RESULTS.md` - Detailed validation results
-- `variants/verilator/QUICK_STATUS.md` - Quick reference for current state
+### Adding New Tests
 
-This project has achieved sophisticated directory-based cache coherence with validated multi-L1 probe mechanisms.
+1. Create testbench in `tb/` directory
+2. Create corresponding C++ driver in `cpp/` directory  
+3. Add build target to `Makefile`
+4. Follow existing naming conventions
 
-## Contributing
+### Debugging
 
-When contributing:
-1. Determine which variant(s) your changes affect
-2. Make changes in the appropriate `variants/` directory
-3. Test using the variant-specific workflow
-4. Consider impact on other variants
-5. Update documentation if needed 
+- Use `make waves` to generate and view VCD waveforms
+- Enable debug output with `$display` statements in testbenches
+- Check lint issues with `make lint`
+
+
+This system provides a clean, focused implementation of directory-based cache coherence for exactly 2 L1 caches on 64-bit systems. 

@@ -12,74 +12,74 @@ module l2_tilelink_adapter (
     input  wire                         rst_n,
     
     // Direct probe interfaces to L1 adapters
-    output wire [3:0]                   l1_probe_req_valid,
-    output wire [127:0]                 l1_probe_req_addr,     // 4 * 32 bits
-    output wire [11:0]                  l1_probe_req_permissions, // 4 * 3 bits
+    output wire [1:0]                   l1_probe_req_valid,
+    output wire [127:0]                 l1_probe_req_addr,     // 2 * 64 bits
+    output wire [5:0]                   l1_probe_req_permissions, // 2 * 3 bits
     
-    input  wire [3:0]                   l1_probe_ack_valid,
-    input  wire [127:0]                 l1_probe_ack_addr,     // 4 * 32 bits
-    input  wire [11:0]                  l1_probe_ack_permissions, // 4 * 3 bits
-    input  wire [1023:0]                l1_probe_ack_dirty_data, // 4 * 256 bits
+    input  wire [1:0]                   l1_probe_ack_valid,
+    input  wire [127:0]                 l1_probe_ack_addr,     // 2 * 64 bits
+    input  wire [5:0]                   l1_probe_ack_permissions, // 2 * 3 bits
+    input  wire [1023:0]                l1_probe_ack_dirty_data, // 2 * 512 bits
     
     // TileLink Channel A (requests from L1s)
-    input  wire [3:0]                   a_valid,
-    input  wire [11:0]                  a_opcode,  // Packed array of opcodes from each master (4*3)
-    input  wire [11:0]                  a_param,   // Packed array of params from each master (4*3)
-    input  wire [15:0]                  a_size,    // Packed array of sizes from each master (4*4)
-    input  wire [15:0]                  a_source,  // Packed array of source IDs from each master (4*4)
-    input  wire [127:0]                 a_address, // Packed array of addresses from each master (4*32)
-    input  wire [255:0]                 a_data,    // Packed array of data from each master (4*64)
-    input  wire [31:0]                  a_mask,    // Packed array of masks from each master (4*8)
-    output wire [3:0]                   a_ready,
+    input  wire [1:0]                   a_valid,
+    input  wire [5:0]                   a_opcode,  // Packed array of opcodes from each master (2*3)
+    input  wire [5:0]                   a_param,   // Packed array of params from each master (2*3)
+    input  wire [7:0]                   a_size,    // Packed array of sizes from each master (2*4)
+    input  wire [7:0]                   a_source,  // Packed array of source IDs from each master (2*4)
+    input  wire [127:0]                 a_address, // Packed array of addresses from each master (2*64)
+    input  wire [1023:0]                a_data,    // Packed array of data from each master (2*512)
+    input  wire [127:0]                 a_mask,    // Packed array of masks from each master (2*64)
+    output wire [1:0]                   a_ready,
     
     // TileLink Channel B (probes to L1s)
-    output reg  [3:0]                   b_valid,
-    output reg  [11:0]                  b_opcode,  // Packed array of opcodes to each master (4*3)
-    output reg  [11:0]                  b_param,   // Packed array of params to each master (4*3)
-    output reg  [15:0]                  b_size,    // Packed array of sizes to each master (4*4)
-    output reg  [15:0]                  b_source,  // Packed array of source IDs to each master (4*4)
-    output reg  [127:0]                 b_address, // Packed array of addresses to each master (4*32)
-    output reg  [255:0]                 b_data,    // Packed array of data to each master (4*64)
-    output reg  [31:0]                  b_mask,    // Packed array of masks to each master (4*8)
-    input  wire [3:0]                   b_ready,
+    output reg  [1:0]                   b_valid,
+    output reg  [5:0]                   b_opcode,  // Packed array of opcodes to each master (2*3)
+    output reg  [5:0]                   b_param,   // Packed array of params to each master (2*3)
+    output reg  [7:0]                   b_size,    // Packed array of sizes to each master (2*4)
+    output reg  [7:0]                   b_source,  // Packed array of source IDs to each master (2*4)
+    output reg  [127:0]                 b_address, // Packed array of addresses to each master (2*64)
+    output reg  [1023:0]                b_data,    // Packed array of data to each master (2*512)
+    output reg  [127:0]                 b_mask,    // Packed array of masks to each master (2*64)
+    input  wire [1:0]                   b_ready,
     
     // TileLink Channel C (responses from L1s)
-    input  wire [3:0]                   c_valid,
-    input  wire [11:0]                  c_opcode,  // Packed array of opcodes from each master (4*3)
-    input  wire [11:0]                  c_param,   // Packed array of params from each master (4*3)
-    input  wire [15:0]                  c_size,    // Packed array of sizes from each master (4*4)
-    input  wire [15:0]                  c_source,  // Packed array of source IDs from each master (4*4)
-    input  wire [127:0]                 c_address, // Packed array of addresses from each master (4*32)
-    input  wire [255:0]                 c_data,    // Packed array of data from each master (4*64)
-    input  wire [3:0]                   c_error,   // Packed array of error flags from each master
-    output wire [3:0]                   c_ready,
+    input  wire [1:0]                   c_valid,
+    input  wire [5:0]                   c_opcode,  // Packed array of opcodes from each master (2*3)
+    input  wire [5:0]                   c_param,   // Packed array of params from each master (2*3)
+    input  wire [7:0]                   c_size,    // Packed array of sizes from each master (2*4)
+    input  wire [7:0]                   c_source,  // Packed array of source IDs from each master (2*4)
+    input  wire [127:0]                 c_address, // Packed array of addresses from each master (2*64)
+    input  wire [1023:0]                c_data,    // Packed array of data from each master (2*512)
+    input  wire [1:0]                   c_error,   // Packed array of error flags from each master
+    output wire [1:0]                   c_ready,
     
     // TileLink Channel D (responses to L1s)
-    output reg  [3:0]                   d_valid,
-    output reg  [11:0]                  d_opcode,  // Packed array of opcodes to each master (4*3)
-    output reg  [11:0]                  d_param,   // Packed array of params to each master (4*3)
-    output reg  [15:0]                  d_size,    // Packed array of sizes to each master (4*4)
-    output reg  [15:0]                  d_source,  // Packed array of source IDs to each master (4*4)
-    output reg  [15:0]                  d_sink,    // Packed array of sink IDs to each master (4*4)
-    output reg  [255:0]                 d_data,    // Packed array of data to each master (4*64)
-    output reg  [3:0]                   d_error,   // Packed array of error flags to each master
-    input  wire [3:0]                   d_ready,
+    output reg  [1:0]                   d_valid,
+    output reg  [5:0]                   d_opcode,  // Packed array of opcodes to each master (2*3)
+    output reg  [5:0]                   d_param,   // Packed array of params to each master (2*3)
+    output reg  [7:0]                   d_size,    // Packed array of sizes to each master (2*4)
+    output reg  [7:0]                   d_source,  // Packed array of source IDs to each master (2*4)
+    output reg  [7:0]                   d_sink,    // Packed array of sink IDs to each master (2*4)
+    output reg  [1023:0]                d_data,    // Packed array of data to each master (2*512)
+    output reg  [1:0]                   d_error,   // Packed array of error flags to each master
+    input  wire [1:0]                   d_ready,
     
     // TileLink Channel E (acknowledgements from L1s)
-    input  wire [3:0]                   e_valid,
-    input  wire [15:0]                  e_sink,    // Packed array of sink IDs from each master (4*4)
-    output wire [3:0]                   e_ready,
+    input  wire [1:0]                   e_valid,
+    input  wire [7:0]                   e_sink,    // Packed array of sink IDs from each master (2*4)
+    output wire [1:0]                   e_ready,
     
     // L2 Cache Controller Interface
     output reg                          l2_cmd_valid,
     output reg  [2:0]                   l2_cmd_type,  // 000=Read, 001=Write, 010=Invalidate, 011=WriteBack
-    output reg  [31:0]                  l2_cmd_addr,
-    output reg  [255:0]                 l2_cmd_data,  // Data for write/write-back commands
+    output reg  [63:0]                  l2_cmd_addr,
+    output reg  [511:0]                 l2_cmd_data,  // Data for write/write-back commands
     output reg  [3:0]                   l2_cmd_size,
     output reg                          l2_cmd_dirty,  // Indicates if data is dirty (for write-back)
     
     input  wire                         l2_response_valid,
-    input  wire [255:0]                 l2_response_data,  // Data from L2 cache for read responses
+    input  wire [511:0]                 l2_response_data,  // Data from L2 cache for read responses
     input  wire                         l2_response_error   // Error status from L2 cache
 );
 
@@ -88,24 +88,25 @@ module l2_tilelink_adapter (
     // Request Arbiter for selecting between multiple master requests
     wire                      arb_valid;
     wire [1:0]                arb_channel;   // 0 = Channel A, 1 = Channel C
-    wire [3:0]                arb_master_oh; // One-hot encoding of selected master
-    wire [1:0]                arb_master_id; // Binary encoding of selected master (log2(4) = 2 bits)
+    wire [1:0]                arb_master_oh; // One-hot encoding of selected master
+    wire [0:0]                arb_master_id; // Binary encoding of selected master (log2(2) = 1 bit)
+    wire                      arb_busy_unused; // Unused output from arbiter
     wire                      arb_ready;
     wire                      arb_busy;
     
     // Directory interface signals
     reg                       dir_lookup_req;
-    reg  [31:0]               dir_lookup_addr;
+    reg  [63:0]               dir_lookup_addr;
     wire                      dir_lookup_valid;
     wire [2:0]                dir_lookup_state;
-    wire [3:0]                dir_lookup_presence;
-    wire [3:0]                dir_lookup_tip_state;
+    wire [1:0]                dir_lookup_presence;
+    wire [1:0]                dir_lookup_tip_state;
     
     reg                       dir_update_req;
-    reg  [31:0]               dir_update_addr;
+    reg  [63:0]               dir_update_addr;
     reg  [2:0]                dir_update_state;
-    reg  [3:0]                dir_update_presence;
-    reg  [3:0]                dir_update_tip_state;
+    reg  [1:0]                dir_update_presence;
+    reg  [1:0]                dir_update_tip_state;
     wire                      dir_update_done;
     
     // Sink ID Manager signals
@@ -133,34 +134,34 @@ module l2_tilelink_adapter (
     reg [3:0] next_state;
     
     // Pending transaction tracking
-    reg [31:0]                 pending_addr;
-    reg [1:0]                  pending_master_id;
+    reg [63:0]                 pending_addr;
+    reg [0:0]                  pending_master_id;
     reg [2:0]                  pending_opcode;
     reg [2:0]                  pending_param;
     reg [3:0]                  pending_source;
     reg [3:0]                  pending_sink;
-    reg [255:0]                pending_data;
+    reg [511:0]                pending_data;
     
     // Latched directory lookup results
     reg                        dir_result_valid;
     reg [2:0]                  dir_result_state;
-    reg [3:0]                  dir_result_presence;
-    reg [3:0]                  dir_result_tip_state;
+    reg [1:0]                  dir_result_presence;
+    reg [1:0]                  dir_result_tip_state;
     
     // Probe response tracking
-    reg [3:0]                  probe_sent;      // Bit vector of L1s that were probed
-    reg [3:0]                  probe_acked;     // Bit vector of L1s that have responded
+    reg [1:0]                  probe_sent;      // Bit vector of L1s that were probed
+    reg [1:0]                  probe_acked;     // Bit vector of L1s that have responded
     
     // L2 response buffering
     reg                        l2_response_buffered;
-    reg [255:0]                l2_response_data_buf;
+    reg [511:0]                l2_response_data_buf;
     reg                        l2_response_error_buf;
     
     // Integer variables for loops
     integer i, j;
     
-    // Request Arbiter instantiation
-    l2_request_arbiter request_arbiter (
+    // Simple 2-Master Arbiter instantiation
+    simple_arbiter request_arbiter (
         .clk(clk),
         .rst_n(rst_n),
         .a_valid_i(a_valid),
@@ -174,7 +175,7 @@ module l2_tilelink_adapter (
         .arb_master_oh(arb_master_oh),
         .arb_master_id(arb_master_id),
         .arb_ready(arb_ready),
-        .arb_busy(arb_busy)
+        .arb_busy(arb_busy_unused)  // unused output
     );
     
     // Directory instantiation
@@ -214,20 +215,20 @@ module l2_tilelink_adapter (
     // Probe signal generation
     genvar k;
     generate
-        for (k = 0; k < 4; k = k + 1) begin : gen_probe_signals
+        for (k = 0; k < 2; k = k + 1) begin : gen_probe_signals
             assign l1_probe_req_valid[k] = (state == STATE_PROBE_SEND) && probe_sent[k] && !probe_acked[k];
-            assign l1_probe_req_addr[k*32 +: 32] = (l1_probe_req_valid[k]) ? pending_addr : 32'b0;
+            assign l1_probe_req_addr[k*64 +: 64] = (l1_probe_req_valid[k]) ? pending_addr : 64'b0;
             assign l1_probe_req_permissions[k*3 +: 3] = (l1_probe_req_valid[k]) ? 
                 ((pending_param == PARAM_NtoT || pending_param == PARAM_BtoT) ? PARAM_toN : PARAM_toB) : 3'b0;
         end
     endgenerate
     
     // Connect to arbiter - ready when we can accept a new request
-    // Always ready to avoid circular dependency - L2 adapter will handle queuing internally if needed
-    assign arb_ready = 1'b1;
+    // Only ready when in IDLE state to prevent overlapping transactions
+    assign arb_ready = (state == STATE_IDLE);
     
     // Grant ready signal on Channel E (always ready to accept GrantAcks)
-    assign e_ready = 4'b1111;
+    assign e_ready = 2'b11;
     
     // Debug state transitions
     reg [3:0] prev_state;
@@ -247,66 +248,66 @@ module l2_tilelink_adapter (
             state <= STATE_IDLE;
             
             // Reset pending transaction tracking
-            pending_addr <= 32'b0;
-            pending_master_id <= 2'b0;
+            pending_addr <= 64'b0;
+            pending_master_id <= 1'b0;
             pending_opcode <= 3'b000;
             pending_param <= 3'b000;
             pending_source <= 4'b0;
             pending_sink <= 4'b0;
-            pending_data <= 256'b0;
+            pending_data <= 512'b0;
             
             // Reset probe tracking
-            probe_sent <= 4'b0;
-            probe_acked <= 4'b0;
+            probe_sent <= 2'b0;
+            probe_acked <= 2'b0;
             
             // Reset latched directory results
             dir_result_valid <= 1'b0;
             dir_result_state <= 3'b000;
-            dir_result_presence <= 4'b0;
-            dir_result_tip_state <= 4'b0;
+            dir_result_presence <= 2'b0;
+            dir_result_tip_state <= 2'b0;
             
             // Reset L2 response buffering
             l2_response_buffered <= 1'b0;
-            l2_response_data_buf <= 256'b0;
+            l2_response_data_buf <= 512'b0;
             l2_response_error_buf <= 1'b0;
             
             // Probe interfaces are continuous assignments
             
             // Reset directory interface
             dir_lookup_req <= 1'b0;
-            dir_lookup_addr <= 32'b0;
+            dir_lookup_addr <= 64'b0;
             dir_update_req <= 1'b0;
-            dir_update_addr <= 32'b0;
+            dir_update_addr <= 64'b0;
             dir_update_state <= 3'b000;
-            dir_update_presence <= 4'b0;
-            dir_update_tip_state <= 4'b0;
+            dir_update_presence <= 2'b0;
+            dir_update_tip_state <= 2'b0;
             
             // Reset L2 cache interface
             l2_cmd_valid <= 1'b0;
             l2_cmd_type <= 3'b000;
-            l2_cmd_addr <= 32'b0;
-            l2_cmd_data <= 256'b0;
+            l2_cmd_addr <= 64'b0;
+            l2_cmd_data <= 512'b0;
             l2_cmd_size <= 4'b0;
             l2_cmd_dirty <= 1'b0;
             
             // Reset TileLink outputs
-            b_valid <= 4'b0;
-            b_opcode <= 12'b0;
-            b_param <= 12'b0;
-            b_size <= 16'b0;
-            b_source <= 16'b0;
+            b_valid <= 2'b0;
+            b_opcode <= 6'b0;
+            b_param <= 6'b0;
+            b_size <= 8'b0;
+            b_source <= 8'b0;
             b_address <= 128'b0;
-            b_data <= 256'b0;
-            b_mask <= 32'b0;
+            b_data <= 1024'b0;
+            b_mask <= 128'b0;
             
-            d_valid <= 4'b0;
-            d_opcode <= 12'b0;
-            d_param <= 12'b0;
-            d_size <= 16'b0;
-            d_source <= 16'b0;
-            d_sink <= 16'b0;
-            d_data <= 256'b0;
-            d_error <= 4'b0;
+            d_valid <= 2'b0;
+            d_opcode <= 6'b0;
+            d_param <= 6'b0;
+            d_size <= 8'b0;
+            d_source <= 8'b0;
+            d_sink <= 8'b0;
+            d_data <= 1024'b0;
+            d_error <= 2'b0;
             
             sink_id_dealloc_sink_id <= 4'b0;
         end
@@ -315,8 +316,8 @@ module l2_tilelink_adapter (
             dir_lookup_req <= 1'b0;
             dir_update_req <= 1'b0;
             l2_cmd_valid <= 1'b0;
-            b_valid <= 4'b0;
-            d_valid <= 4'b0;
+            b_valid <= 2'b0;
+            d_valid <= 2'b0;
             
             // State machine transitions
             state <= next_state;
@@ -356,19 +357,19 @@ module l2_tilelink_adapter (
                         // Extract information based on channel
                         if (arb_channel == 2'b00) begin // Channel A
                             // Extract Channel A signals for the selected master
-                            pending_addr <= a_address[arb_master_id*32 +: 32];
+                            pending_addr <= a_address[arb_master_id*64 +: 64];
                             pending_opcode <= a_opcode[arb_master_id*3 +: 3];
                             pending_param <= a_param[arb_master_id*3 +: 3];
                             pending_source <= a_source[arb_master_id*4 +: 4];
-                            pending_data <= {{(256-64){1'b0}}, a_data[arb_master_id*64 +: 64]};
+                            pending_data <= a_data[arb_master_id*512 +: 512];
                         end
                         else begin // Channel C
                             // Extract Channel C signals for the selected master
-                            pending_addr <= c_address[arb_master_id*32 +: 32];
+                            pending_addr <= c_address[arb_master_id*64 +: 64];
                             pending_opcode <= c_opcode[arb_master_id*3 +: 3];
                             pending_param <= c_param[arb_master_id*3 +: 3];
                             pending_source <= c_source[arb_master_id*4 +: 4];
-                            pending_data <= {{(256-64){1'b0}}, c_data[arb_master_id*64 +: 64]};
+                            pending_data <= c_data[arb_master_id*512 +: 512];
                         end
                     end
                 end
@@ -393,21 +394,21 @@ module l2_tilelink_adapter (
                             if (dir_result_state == DIR_STATE_SHARED || dir_result_state == DIR_STATE_EXCLUSIVE) begin
                                 // There are sharers that need to be probed
                                 probe_sent <= dir_result_presence & ~(1 << pending_master_id); // Don't probe requesting L1
-                                probe_acked <= 4'b0;
+                                probe_acked <= 2'b0;
                                 $display("[L2 DEBUG] Setting probe_sent=%b (presence=%b, exclude_master=%b)", 
                                          dir_result_presence & ~(1 << pending_master_id), dir_result_presence, 1 << pending_master_id);
                             end
                             else begin
                                 // No sharers, can proceed directly to L2 access
-                                probe_sent <= 4'b0;
-                                probe_acked <= 4'b0;
+                                probe_sent <= 2'b0;
+                                probe_acked <= 2'b0;
                                 $display("[L2 DEBUG] No probes needed, dir_state=%b", dir_result_state);
                             end
                         end
                         else begin // NtoB - shared access
                             // No probes needed for shared access
-                            probe_sent <= 4'b0;
-                            probe_acked <= 4'b0;
+                            probe_sent <= 2'b0;
+                            probe_acked <= 2'b0;
                             $display("[L2 DEBUG] Shared access, no probes needed");
                         end
                     end
@@ -418,9 +419,9 @@ module l2_tilelink_adapter (
                 end
                 
                 STATE_PROBE_WAIT: begin
-                    // Check for incoming probe acknowledgments from L1 adapters
-                    for (j = 0; j < 4; j = j + 1) begin
-                        if (l1_probe_ack_valid[j] && l1_probe_ack_addr[j*32 +: 32] == pending_addr && probe_sent[j]) begin
+                                          // Check for incoming probe acknowledgments from L1 adapters
+                      for (j = 0; j < 2; j = j + 1) begin
+                        if (l1_probe_ack_valid[j] && l1_probe_ack_addr[j*64 +: 64] == pending_addr && probe_sent[j]) begin
                             // Mark this L1 as having responded
                             probe_acked[j] <= 1'b1;
                             
@@ -430,7 +431,7 @@ module l2_tilelink_adapter (
                                 l2_cmd_valid <= 1'b1;
                                 l2_cmd_type <= L2_CMD_WRITE_BACK;
                                 l2_cmd_addr <= pending_addr;
-                                l2_cmd_data <= l1_probe_ack_dirty_data[j*256 +: 256];
+                                l2_cmd_data <= l1_probe_ack_dirty_data[j*512 +: 512];
                                 l2_cmd_size <= 4'($clog2(256/8));
                                 l2_cmd_dirty <= 1'b1;
                             end
@@ -444,7 +445,7 @@ module l2_tilelink_adapter (
                         l2_cmd_valid <= 1'b1;
                         l2_cmd_type <= L2_CMD_READ;
                         l2_cmd_addr <= pending_addr;
-                        l2_cmd_data <= 256'b0;
+                        l2_cmd_data <= 512'b0;
                         l2_cmd_size <= 4'($clog2(256/8));
                         l2_cmd_dirty <= 1'b0;
                     end
@@ -464,7 +465,7 @@ module l2_tilelink_adapter (
                         d_source[pending_master_id*4 +: 4] <= pending_source;
                         d_sink[pending_master_id*4 +: 4] <= sink_id_alloc_sink_id;
                         // Use buffered data if available, otherwise direct L2 response
-                        d_data[pending_master_id*64 +: 64] <= l2_response_buffered ? l2_response_data_buf[63:0] : l2_response_data[63:0];
+                        d_data[pending_master_id*512 +: 512] <= l2_response_buffered ? l2_response_data_buf : l2_response_data;
                         d_error[pending_master_id] <= l2_response_buffered ? l2_response_error_buf : l2_response_error;
                         $display("[L2 DEBUG] Grant sent to L1_%d: data=%h", pending_master_id, 
                                  l2_response_buffered ? l2_response_data_buf[63:0] : l2_response_data[63:0]);
@@ -514,7 +515,7 @@ module l2_tilelink_adapter (
                     d_size[pending_master_id*4 +: 4] <= 4'($clog2(256/8));
                     d_source[pending_master_id*4 +: 4] <= pending_source;
                     d_sink[pending_master_id*4 +: 4] <= {4{1'b0}};
-                    d_data[pending_master_id*64 +: 64] <= {64{1'b0}};
+                    d_data[pending_master_id*512 +: 512] <= {512{1'b0}};
                     d_error[pending_master_id] <= 1'b0;
                 end
                 
@@ -551,7 +552,7 @@ module l2_tilelink_adapter (
                         l2_cmd_valid <= 1'b1;
                         l2_cmd_type <= L2_CMD_READ;
                         l2_cmd_addr <= pending_addr;
-                        l2_cmd_data <= {256{1'b0}};
+                        l2_cmd_data <= {512{1'b0}};
                         l2_cmd_size <= 4'($clog2(256/8));
                         l2_cmd_dirty <= 1'b0;
                     end
@@ -571,7 +572,7 @@ module l2_tilelink_adapter (
                         d_size[pending_master_id*4 +: 4] <= 4'($clog2(256/8));
                         d_source[pending_master_id*4 +: 4] <= pending_source;
                         d_sink[pending_master_id*4 +: 4] <= {4{1'b0}};
-                        d_data[pending_master_id*64 +: 64] <= {64{1'b0}};
+                        d_data[pending_master_id*512 +: 512] <= {512{1'b0}};
                         d_error[pending_master_id] <= l2_response_error;
                     end
                 end
@@ -634,7 +635,7 @@ module l2_tilelink_adapter (
             
             STATE_PROBE_SEND: begin
                 // Check if all required probes have been sent (valid && ready handshake)
-                if (probe_sent == 4'b0000) begin
+                if (probe_sent == 2'b00) begin
                     // No probes needed, go directly to L2 access
                     next_state = STATE_L2_ACCESS;
                 end else begin

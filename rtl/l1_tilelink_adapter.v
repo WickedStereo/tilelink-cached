@@ -17,27 +17,27 @@ module l1_tilelink_adapter (
     
     // L1 Cache Controller Interface - requests from L1
     input  wire                         l1_request_valid,
-    input  wire [31:0]                  l1_request_addr,
+    input  wire [63:0]                  l1_request_addr,
     input  wire [2:0]                   l1_request_type,  // 000=ReadMiss, 001=WriteMiss, 010=WriteBack
-    input  wire [255:0]                 l1_request_data,  // Data for write-back requests
+    input  wire [511:0]                 l1_request_data,  // Data for write-back requests
     input  wire [2:0]                   l1_request_permissions, // NtoB, NtoT, BtoT
     output wire                         l1_request_ready,
     
     // L1 Cache Controller Interface - data to L1
     output reg                          data_to_l1_valid,
-    output reg  [255:0]                 data_to_l1_data,
+    output reg  [511:0]                 data_to_l1_data,
     output reg                          data_to_l1_error,
     
     // L1 Cache Controller Interface - probe requests to L1 (INPUTS - L1 receives probes)
     input  wire                         probe_req_to_l1_valid,
-    input  wire [31:0]                  probe_req_to_l1_addr,
+    input  wire [63:0]                  probe_req_to_l1_addr,
     input  wire [2:0]                   probe_req_to_l1_permissions, // toN, toB, toT
     
     // L1 Cache Controller Interface - probe acknowledgements from L1
     input  wire                         probe_ack_from_l1_valid,
-    input  wire [31:0]                  probe_ack_from_l1_addr,
+    input  wire [63:0]                  probe_ack_from_l1_addr,
     input  wire [2:0]                   probe_ack_from_l1_permissions, // TtoT, TtoB, TtoN, BtoB, BtoN, NtoN
-    input  wire [255:0]                 probe_ack_from_l1_dirty_data,  // Dirty data if being written back
+    input  wire [511:0]                 probe_ack_from_l1_dirty_data,  // Dirty data if being written back
     
     // TileLink Channel A (requests to L2)
     output reg                          a_valid,
@@ -45,9 +45,9 @@ module l1_tilelink_adapter (
     output reg  [2:0]                   a_param,
     output reg  [3:0]                   a_size,
     output reg  [3:0]                   a_source,
-    output reg  [31:0]                  a_address,
-    output reg  [63:0]                  a_data,
-    output reg  [7:0]                   a_mask,
+    output reg  [63:0]                  a_address,
+    output reg  [511:0]                 a_data,
+    output reg  [63:0]                  a_mask,
     input  wire                         a_ready,
     
     // TileLink Channel B (probes from L2)
@@ -56,9 +56,9 @@ module l1_tilelink_adapter (
     input  wire [2:0]                   b_param,
     input  wire [3:0]                   b_size,
     input  wire [3:0]                   b_source,
-    input  wire [31:0]                  b_address,
-    input  wire [63:0]                  b_data,
-    input  wire [7:0]                   b_mask,
+    input  wire [63:0]                  b_address,
+    input  wire [511:0]                 b_data,
+    input  wire [63:0]                  b_mask,
     output reg                          b_ready,
     
     // TileLink Channel C (responses to L2)
@@ -67,8 +67,8 @@ module l1_tilelink_adapter (
     output reg  [2:0]                   c_param,
     output reg  [3:0]                   c_size,
     output reg  [3:0]                   c_source,
-    output reg  [31:0]                  c_address,
-    output reg  [63:0]                  c_data,
+    output reg  [63:0]                  c_address,
+    output reg  [511:0]                 c_data,
     output reg                          c_error,
     input  wire                         c_ready,
     
@@ -79,7 +79,7 @@ module l1_tilelink_adapter (
     input  wire [3:0]                   d_size,
     input  wire [3:0]                   d_source,
     input  wire [3:0]                   d_sink,
-    input  wire [63:0]                  d_data,
+    input  wire [511:0]                 d_data,
     input  wire                         d_error,
     output reg                          d_ready,
     
@@ -107,14 +107,14 @@ module l1_tilelink_adapter (
     reg [3:0] next_state;
     
     // Pending transaction storage
-    reg [31:0] pending_addr;
+    reg [63:0] pending_addr;
     reg [2:0] pending_req_type;
     reg [2:0] pending_permissions;
-    reg [255:0] pending_data;
+    reg [511:0] pending_data;
     reg pending_has_data;
     
     // Probe tracking
-    reg [31:0] probe_addr;
+    reg [63:0] probe_addr;
     reg [2:0] probe_param;
     reg [3:0] probe_source;
     
@@ -180,21 +180,21 @@ module l1_tilelink_adapter (
     assign l1_request_ready = can_accept_new_request && (allocated_source_id_valid || alloc_source_id_gnt);
     
     // Cache line size calculation for TileLink size field (log2 of bytes)
-    localparam CACHE_LINE_SIZE = $clog2(256 / 8);  // $clog2(32) = 5
+    localparam CACHE_LINE_SIZE = $clog2(512 / 8);  // $clog2(64) = 6
     
     // Sequential logic
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             // Reset all registers
             state <= STATE_IDLE;
-            pending_addr <= 32'b0;
+            pending_addr <= 64'b0;
             pending_req_type <= 3'b000;
             pending_permissions <= 3'b000;
-            pending_data <= 256'b0;
+            pending_data <= 512'b0;
             pending_has_data <= 1'b0;
             pending_source_id <= 4'b0;
             
-            probe_addr <= 32'b0;
+            probe_addr <= 64'b0;
             probe_param <= 3'b000;
             probe_source <= 4'b0;
             
@@ -204,7 +204,7 @@ module l1_tilelink_adapter (
             
             // Reset outputs
             data_to_l1_valid <= 1'b0;
-            data_to_l1_data <= 256'b0;
+            data_to_l1_data <= 512'b0;
             data_to_l1_error <= 1'b0;
             
             // Reset TileLink A channel outputs
@@ -213,9 +213,9 @@ module l1_tilelink_adapter (
             a_param <= 3'b000;
             a_size <= 4'b0;
             a_source <= 4'b0;
-            a_address <= 32'b0;
-            a_data <= 64'b0;
-            a_mask <= 8'b0;
+            a_address <= 64'b0;
+            a_data <= 512'b0;
+            a_mask <= 64'b0;
             
             // Reset TileLink B channel outputs
             b_ready <= 1'b1;  // Always ready to receive probes
@@ -226,8 +226,8 @@ module l1_tilelink_adapter (
             c_param <= 3'b000;
             c_size <= 4'b0;
             c_source <= 4'b0;
-            c_address <= 32'b0;
-            c_data <= 64'b0;
+            c_address <= 64'b0;
+            c_data <= 512'b0;
             c_error <= 1'b0;
             
             // Reset TileLink D channel outputs
@@ -279,8 +279,8 @@ module l1_tilelink_adapter (
                     a_size <= CACHE_LINE_SIZE[3:0]; // Size of a cache line
                     a_source <= pending_source_id;
                     a_address <= pending_addr;
-                    a_data <= 64'b0;  // No data for Acquire
-                    a_mask <= 8'b11111111;    // Full mask
+                    a_data <= 512'b0;  // No data for Acquire
+                    a_mask <= 64'hFFFFFFFFFFFFFFFF;    // Full mask
                     
                     // If the message was accepted by the network
                     if (a_ready) begin
@@ -299,7 +299,7 @@ module l1_tilelink_adapter (
                         // If this was a GrantData, forward the data to the L1 cache
                         if (d_opcode == D_OPCODE_GRANT_DATA) begin
                             data_to_l1_valid <= 1'b1;
-                            data_to_l1_data <= {{(256-64){1'b0}}, d_data};  // Pad the data to cache line width
+                            data_to_l1_data <= d_data;  // Full 512-bit data
                             data_to_l1_error <= d_error;
                         end
                         
@@ -327,7 +327,7 @@ module l1_tilelink_adapter (
                     c_size <= CACHE_LINE_SIZE[3:0]; // Size of a cache line
                     c_source <= pending_source_id;
                     c_address <= pending_addr;
-                    c_data <= pending_has_data ? pending_data[63:0] : 64'b0;
+                    c_data <= pending_has_data ? pending_data : 512'b0;
                     c_error <= 1'b0;
                     
                     // If the message was accepted by the network
@@ -373,12 +373,12 @@ module l1_tilelink_adapter (
                             probe_ack_from_l1_permissions == PARAM_TtoN) begin
                             // We're sending data back
                             c_opcode <= C_OPCODE_PROBE_ACK_DATA;
-                            c_data <= probe_ack_from_l1_dirty_data[63:0];
+                            c_data <= probe_ack_from_l1_dirty_data;
                         end
                         else begin
                             // No data
                             c_opcode <= C_OPCODE_PROBE_ACK;
-                            c_data <= 64'b0;
+                            c_data <= 512'b0;
                         end
                         
                         c_param <= probe_ack_from_l1_permissions; // TtoT, TtoB, TtoN, BtoB, BtoN, NtoN
@@ -401,13 +401,13 @@ module l1_tilelink_adapter (
                     // Determine opcode based on request type
                     if (pending_req_type == L1_REQ_UNCACHED_READ) begin
                         a_opcode <= A_OPCODE_GET;
-                        a_data <= 64'b0;
-                        a_mask <= 8'b11111111;  // Full mask for Get
+                                            a_data <= 512'b0;   
+                    a_mask <= 64'hFFFFFFFFFFFFFFFF;  // Full mask for Get
                     end
                     else begin // UNCACHED_WRITE
                         a_opcode <= A_OPCODE_PUT_FULL_DATA;
-                        a_data <= pending_data[63:0];  // Only first beat for now
-                        a_mask <= 8'b11111111;  // Full mask for PutFullData
+                        a_data <= pending_data;  // Full 512-bit data
+                        a_mask <= 64'hFFFFFFFFFFFFFFFF;  // Full mask for PutFullData
                     end
                     
                     a_param <= 3'b000;  // No special parameters for uncached requests
@@ -429,7 +429,7 @@ module l1_tilelink_adapter (
                         // If this was a read (AccessAckData), forward the data to the L1 cache
                         if (d_opcode == D_OPCODE_ACCESS_ACK_DATA) begin
                             data_to_l1_valid <= 1'b1;
-                            data_to_l1_data <= {{(256-64){1'b0}}, d_data};  // Pad the data to cache line width
+                            data_to_l1_data <= d_data;  // Full 512-bit data
                             data_to_l1_error <= d_error;
                         end
                         

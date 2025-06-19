@@ -1,105 +1,89 @@
-# TIDC Multi-Variant Makefile
-# Supports both standard (parameterized) and verilator (de-parameterized) variants
+## Makefile for TIDC 2-Master System Simulation with Verilator
 
-# Default variant
-VARIANT ?= verilator
+# Project settings
+PROJECT = tidc_system
+SIMPLE_PROBE_TB_MODULE = simple_probe_test
+TWO_MASTER_TB_MODULE = two_master_test
+DUT_MODULE = tidc_top
 
-# Variant directories
-STANDARD_DIR = variants/standard
-VERILATOR_DIR = variants/verilator
+# Source files
+RTL_DIR = rtl
+TB_DIR = tb
+CPP_DIR = cpp
+RTL_SOURCES = $(wildcard $(RTL_DIR)/*.v)
+SIMPLE_PROBE_TB_SOURCES = $(TB_DIR)/simple_probe_test.v $(CPP_DIR)/main_simple_probe.cpp
+TWO_MASTER_TB_SOURCES = $(TB_DIR)/two_master_test.v $(CPP_DIR)/main_two_master.cpp
 
-# Validate variant selection
-ifeq ($(VARIANT),standard)
-    VARIANT_DIR = $(STANDARD_DIR)
-    MAKEFILE_PATH = $(STANDARD_DIR)/Makefile
-else ifeq ($(VARIANT),verilator)
-    VARIANT_DIR = $(VERILATOR_DIR)
-    MAKEFILE_PATH = $(VERILATOR_DIR)/Makefile
-else
-    $(error Invalid VARIANT. Use 'standard' or 'verilator')
-endif
+# Build directory
+BUILD_DIR = obj_dir
 
-.PHONY: all sim waves clean lint help list-variants
+# Verilator settings
+VERILATOR = verilator
+VERILATOR_FLAGS = -Wall -Wno-UNUSED -Wno-UNOPTFLAT -Wno-WIDTH -Wno-CASEINCOMPLETE -Wno-STMTDLY -Wno-INFINITELOOP -Wno-SYNCASYNCNET -Wno-CMPCONST -Wno-DECLFILENAME --cc --exe --trace
+VERILATOR_INCLUDES = -I$(RTL_DIR)
 
-# Default target
-all: check-variant sim
+# C++ settings
+CXX_FLAGS = -O3 -std=c++14
 
-# Check if variant directory exists
-check-variant:
-	@if [ ! -d "$(VARIANT_DIR)" ]; then \
-		echo "Error: Variant directory $(VARIANT_DIR) does not exist"; \
-		echo "Available variants: $$(ls variants/ 2>/dev/null || echo 'none')"; \
-		exit 1; \
+# Targets
+.PHONY: all clean simple-probe-test two-master-test waves lint help
+
+all: two-master-test
+
+# Build the simple probe test executable
+$(BUILD_DIR)/V$(SIMPLE_PROBE_TB_MODULE): $(RTL_SOURCES) $(SIMPLE_PROBE_TB_SOURCES)
+	@echo "Building simple probe test with Verilator..."
+	$(VERILATOR) $(VERILATOR_FLAGS) $(VERILATOR_INCLUDES) \
+		--top-module $(SIMPLE_PROBE_TB_MODULE) \
+		$(SIMPLE_PROBE_TB_SOURCES) $(RTL_SOURCES) \
+		--build -o V$(SIMPLE_PROBE_TB_MODULE)
+
+# Build the two master test executable
+$(BUILD_DIR)/V$(TWO_MASTER_TB_MODULE): $(RTL_SOURCES) $(TWO_MASTER_TB_SOURCES)
+	@echo "Building two master test with Verilator..."
+	$(VERILATOR) $(VERILATOR_FLAGS) $(VERILATOR_INCLUDES) \
+		--top-module $(TWO_MASTER_TB_MODULE) \
+		$(TWO_MASTER_TB_SOURCES) $(RTL_SOURCES) \
+		--build -o V$(TWO_MASTER_TB_MODULE)
+
+# Run simple probe test
+simple-probe-test: $(BUILD_DIR)/V$(SIMPLE_PROBE_TB_MODULE)
+	@echo "Running simple probe test..."
+	cd $(BUILD_DIR) && ./V$(SIMPLE_PROBE_TB_MODULE)
+
+# Run two master test
+two-master-test: $(BUILD_DIR)/V$(TWO_MASTER_TB_MODULE)
+	@echo "Running two master test..."
+	cd $(BUILD_DIR) && ./V$(TWO_MASTER_TB_MODULE)
+
+# View waveforms (requires GTKWave)
+waves: simple-probe-test
+	@echo "Opening waveforms in GTKWave..."
+	@if [ -f simple_probe_test.vcd ]; then \
+		gtkwave simple_probe_test.vcd & \
+	else \
+		echo "VCD file not found. Make sure simulation ran successfully."; \
 	fi
-	@if [ ! -f "$(MAKEFILE_PATH)" ]; then \
-		echo "Error: Makefile not found at $(MAKEFILE_PATH)"; \
-		exit 1; \
-	fi
-	@echo "Building variant: $(VARIANT)"
 
-# Run simulation for selected variant
-sim: check-variant
-	@$(MAKE) -C $(VARIANT_DIR) sim
+# Clean build files
+clean:
+	@echo "Cleaning build files..."
+	rm -rf $(BUILD_DIR)
+	rm -f *.vcd
+	rm -f *.out
 
-# View waveforms for selected variant
-waves: check-variant
-	@$(MAKE) -C $(VARIANT_DIR) waves
-
-# Clean build files for selected variant
-clean: check-variant
-	@$(MAKE) -C $(VARIANT_DIR) clean
-
-# Clean all variants
-clean-all:
-	@echo "Cleaning all variants..."
-	@for variant in $$(ls variants/ 2>/dev/null || echo ''); do \
-		if [ -f "variants/$$variant/Makefile" ]; then \
-			echo "Cleaning $$variant..."; \
-			$(MAKE) -C "variants/$$variant" clean; \
-		fi; \
-	done
-
-# Lint check for selected variant
-lint: check-variant
-	@$(MAKE) -C $(VARIANT_DIR) lint
-
-# List available variants
-list-variants:
-	@echo "Available variants:"
-	@for variant in $$(ls variants/ 2>/dev/null || echo ''); do \
-		echo "  $$variant"; \
-	done
-
-# Quick build and test both variants
-test-all:
-	@echo "Testing all variants..."
-	@for variant in $$(ls variants/ 2>/dev/null || echo ''); do \
-		if [ -f "variants/$$variant/Makefile" ]; then \
-			echo "Testing $$variant..."; \
-			$(MAKE) -C "variants/$$variant" sim || echo "$$variant failed"; \
-		fi; \
-	done
+# Quick lint check
+lint: $(RTL_SOURCES)
+	@echo "Running lint check..."
+	$(VERILATOR) --lint-only $(VERILATOR_INCLUDES) $(RTL_SOURCES)
 
 # Help
 help:
-	@echo "TIDC Multi-Variant Build System"
-	@echo ""
-	@echo "Usage:"
-	@echo "  make [VARIANT=standard|verilator] [target]"
-	@echo ""
 	@echo "Available targets:"
-	@echo "  all           - Build and run simulation (default)"
-	@echo "  sim           - Build and run simulation"
-	@echo "  waves         - Run simulation and open waveforms"
-	@echo "  lint          - Run lint check on RTL"
-	@echo "  clean         - Clean build files for selected variant"
-	@echo "  clean-all     - Clean build files for all variants"
-	@echo "  test-all      - Test all variants"
-	@echo "  list-variants - List available variants"
-	@echo "  help          - Show this help"
-	@echo ""
-	@echo "Examples:"
-	@echo "  make                              # Build verilator variant (default)"
-	@echo "  make VARIANT=standard sim         # Build standard variant"
-	@echo "  make VARIANT=verilator waves      # Run verilator with waveforms"
-	@echo "  make clean-all                    # Clean all variants" 
+	@echo "  all              - Build and run two master test (default)"
+	@echo "  simple-probe-test - Build and run simple probe test"
+	@echo "  two-master-test  - Build and run two master test"
+	@echo "  waves            - Run simple probe test and open waveforms"
+	@echo "  lint             - Run lint check on RTL"
+	@echo "  clean            - Clean build files"
+	@echo "  help             - Show this help" 

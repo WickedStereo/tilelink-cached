@@ -1,7 +1,7 @@
 // =============================================================================
 // Project: TileLink Inclusive Directory Coherence (TIDC) System
 // Module: TIDC System Parameters
-// Description: Shared parameter definitions for the TIDC system
+// Description: Shared parameter definitions for the 2-master TIDC system (64-bit)
 // =============================================================================
 
 `ifndef TIDC_PARAMS_V
@@ -87,14 +87,12 @@ localparam DIR_STATE_EXCLUSIVE          = 2;   // Line present in exactly 1 L1 a
 localparam DIR_STATE_PENDING_PROBE      = 3;   // In process of probing L1s
 localparam DIR_STATE_PENDING_GRANT      = 4;   // In process of granting to L1
 
-// System Configuration Parameters
-localparam NUM_L1_CACHES               = 4;    // Number of L1 cache interfaces
+// System Configuration Constants (hard-coded for 2-master 64-bit system)
 localparam WDATA                       = 8;    // TileLink data width in bytes
-localparam WADDR                       = 32;   // Address width in bits
-localparam CACHE_LINE_BITS             = 256;  // Cache line size in bits
+localparam WADDR                       = 64;   // Address width in bits (64-bit system)
+localparam CACHE_LINE_BITS             = 512;  // Cache line size in bits (64 bytes)
 localparam WSOURCE                     = 4;    // Source ID width in bits (16 IDs)
 localparam WSINK                       = 4;    // Sink ID width in bits (16 IDs)
 localparam WSIZE                       = 4;    // Size field width in bits
-localparam NUM_MASTERS                 = 4;    // Number of masters (L1 caches)
 
 `endif // TIDC_PARAMS_V

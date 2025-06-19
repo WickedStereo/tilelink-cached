@@ -13,45 +13,45 @@ module directory (
     
     // Directory lookup interface
     input  wire                       lookup_req,
-    input  wire [31:0]                lookup_addr,
+    input  wire [63:0]                lookup_addr,
     output reg                        lookup_valid,
     output reg  [2:0]                 lookup_state,  // DIR_STATE_*
-    output reg  [3:0]                 lookup_presence,  // Bit vector of L1s with this line
-    output reg  [3:0]                 lookup_tip_state, // Bit vector of L1s with Tip permission
+    output reg  [1:0]                 lookup_presence,  // Bit vector of L1s with this line
+    output reg  [1:0]                 lookup_tip_state, // Bit vector of L1s with Tip permission
     
     // Directory update interface
     input  wire                       update_req,
-    input  wire [31:0]                update_addr,
+    input  wire [63:0]                update_addr,
     input  wire [2:0]                 update_state,  // New directory state (DIR_STATE_*)
-    input  wire [3:0]                 update_presence,  // New presence vector
-    input  wire [3:0]                 update_tip_state, // New Tip state vector
+    input  wire [1:0]                 update_presence,  // New presence vector
+    input  wire [1:0]                 update_tip_state, // New Tip state vector
     output reg                        update_done
 );
 
     // Directory parameters
     localparam DIR_SIZE = 64;  // Small directory for testing
     localparam DIR_INDEX_WIDTH = 6;  // 6 bits for 64 entries
-    localparam DIR_TAG_WIDTH = 32 - DIR_INDEX_WIDTH; // 26 bits
+    localparam DIR_TAG_WIDTH = 64 - DIR_INDEX_WIDTH; // 58 bits
     
     // Directory entry structure
     reg [DIR_TAG_WIDTH-1:0]       dir_tags [DIR_SIZE-1:0];
     reg [2:0]                     dir_states [DIR_SIZE-1:0];
-    reg [3:0]                     dir_presence [DIR_SIZE-1:0];
-    reg [3:0]                     dir_tip_state [DIR_SIZE-1:0];
+    reg [1:0]                     dir_presence [DIR_SIZE-1:0];
+    reg [1:0]                     dir_tip_state [DIR_SIZE-1:0];
     reg                           dir_valid [DIR_SIZE-1:0];
     
     // Extract index and tag from address
     function [DIR_INDEX_WIDTH-1:0] get_index;
-        input [31:0] addr;
+        input [63:0] addr;
         begin
             get_index = addr[DIR_INDEX_WIDTH-1:0];
         end
     endfunction
     
     function [DIR_TAG_WIDTH-1:0] get_tag;
-        input [31:0] addr;
+        input [63:0] addr;
         begin
-            get_tag = addr[31:DIR_INDEX_WIDTH];
+            get_tag = addr[63:DIR_INDEX_WIDTH];
         end
     endfunction
     
@@ -64,7 +64,7 @@ module directory (
     reg [1:0] next_state;
     
     // Processed request storage
-    reg [31:0] req_addr;
+    reg [63:0] req_addr;
     
     // Reset and initialization
     integer i;
@@ -75,21 +75,21 @@ module directory (
                 dir_valid[i] <= 1'b0;
                 dir_tags[i] <= {DIR_TAG_WIDTH{1'b0}};
                 dir_states[i] <= DIR_STATE_INVALID;
-                dir_presence[i] <= 4'b0;
-                dir_tip_state[i] <= 4'b0;
+                dir_presence[i] <= 2'b00;
+                dir_tip_state[i] <= 2'b00;
             end
             
             // Initialize outputs
             lookup_valid <= 1'b0;
             lookup_state <= 3'b000;
-            lookup_presence <= 4'b0;
-            lookup_tip_state <= 4'b0;
+            lookup_presence <= 2'b00;
+            lookup_tip_state <= 2'b00;
             
             update_done <= 1'b0;
             
             // Initialize state machine
             state <= STATE_IDLE;
-            req_addr <= 32'b0;
+            req_addr <= 64'b0;
         end
         else begin
             // Default values
@@ -125,8 +125,8 @@ module directory (
                         // Directory miss (entry not present)
                         lookup_valid <= 1'b1;
                         lookup_state <= DIR_STATE_INVALID;
-                        lookup_presence <= 4'b0;
-                        lookup_tip_state <= 4'b0;
+                        lookup_presence <= 2'b00;
+                        lookup_tip_state <= 2'b00;
                         $display("[DIR DEBUG] MISS addr=%h: returning INVALID", req_addr);
                     end
                 end
