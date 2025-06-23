@@ -2,6 +2,7 @@
 // Project: TileLink Inclusive Directory Coherence (TIDC) System
 // Module: Directory
 // Description: Stores and manages the global coherence state for each cache line
+//              Simplified version without unnecessary state machine
 // =============================================================================
 
 // Include shared parameter definitions
@@ -11,21 +12,21 @@ module directory (
     input  wire                       clk,
     input  wire                       rst_n,
     
-    // Directory lookup interface
+    // Directory lookup interface - now combinational
     input  wire                       lookup_req,
     input  wire [63:0]                lookup_addr,
-    output reg                        lookup_valid,
-    output reg  [2:0]                 lookup_state,  // DIR_STATE_*
-    output reg  [1:0]                 lookup_presence,  // Bit vector of L1s with this line
-    output reg  [1:0]                 lookup_tip_state, // Bit vector of L1s with Tip permission
+    output wire                       lookup_valid,
+    output wire [2:0]                 lookup_state,  // DIR_STATE_*
+    output wire [1:0]                 lookup_presence,  // Bit vector of L1s with this line
+    output wire [1:0]                 lookup_tip_state, // Bit vector of L1s with Tip permission
     
-    // Directory update interface
+    // Directory update interface - single cycle
     input  wire                       update_req,
     input  wire [63:0]                update_addr,
     input  wire [2:0]                 update_state,  // New directory state (DIR_STATE_*)
     input  wire [1:0]                 update_presence,  // New presence vector
     input  wire [1:0]                 update_tip_state, // New Tip state vector
-    output reg                        update_done
+    output wire                       update_done
 );
 
     // Directory parameters
@@ -55,18 +56,21 @@ module directory (
         end
     endfunction
     
-    // State machine for directory operations
-    localparam STATE_IDLE     = 2'd0;
-    localparam STATE_LOOKUP   = 2'd1;
-    localparam STATE_UPDATE   = 2'd2;
+    // Combinational lookup logic
+    wire [DIR_INDEX_WIDTH-1:0] lookup_index = get_index(lookup_addr);
+    wire [DIR_TAG_WIDTH-1:0] lookup_tag = get_tag(lookup_addr);
+    wire lookup_hit = dir_valid[lookup_index] && (dir_tags[lookup_index] == lookup_tag);
     
-    reg [1:0] state;
-    reg [1:0] next_state;
+    // Lookup outputs - combinational
+    assign lookup_valid = lookup_req;  // Always valid when requested
+    assign lookup_state = lookup_hit ? dir_states[lookup_index] : DIR_STATE_INVALID;
+    assign lookup_presence = lookup_hit ? dir_presence[lookup_index] : 2'b00;
+    assign lookup_tip_state = lookup_hit ? dir_tip_state[lookup_index] : 2'b00;
     
-    // Processed request storage
-    reg [63:0] req_addr;
+    // Update done - single cycle
+    assign update_done = update_req;  // Done immediately when requested
     
-    // Reset and initialization
+    // Reset and update logic
     integer i;
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
@@ -78,109 +82,30 @@ module directory (
                 dir_presence[i] <= 2'b00;
                 dir_tip_state[i] <= 2'b00;
             end
-            
-            // Initialize outputs
-            lookup_valid <= 1'b0;
-            lookup_state <= 3'b000;
-            lookup_presence <= 2'b00;
-            lookup_tip_state <= 2'b00;
-            
-            update_done <= 1'b0;
-            
-            // Initialize state machine
-            state <= STATE_IDLE;
-            req_addr <= 64'b0;
         end
         else begin
-            // Default values
-            lookup_valid <= 1'b0;
-            update_done <= 1'b0;
-            
-            // State machine transitions
-            state <= next_state;
-            
-            // Save request address
-            if ((state == STATE_IDLE && lookup_req) || (state == STATE_IDLE && update_req)) begin
-                req_addr <= lookup_req ? lookup_addr : update_addr;
+            // Handle directory updates
+            if (update_req) begin
+                dir_valid[get_index(update_addr)] <= 1'b1;
+                dir_tags[get_index(update_addr)] <= get_tag(update_addr);
+                dir_states[get_index(update_addr)] <= update_state;
+                dir_presence[get_index(update_addr)] <= update_presence;
+                dir_tip_state[get_index(update_addr)] <= update_tip_state;
+                
+                $display("[DIR DEBUG] UPDATE addr=%h: state=%b, presence=%b, tip_state=%b", 
+                         update_addr, update_state, update_presence, update_tip_state);
             end
             
-            // Handle directory operations
-            case (state)
-                STATE_IDLE: begin
-                    // No operation in IDLE, transitions handled in next_state logic
+            // Debug lookup hits
+            if (lookup_req) begin
+                if (lookup_hit) begin
+                    $display("[DIR DEBUG] HIT addr=%h: state=%b, presence=%b, tip_state=%b", 
+                             lookup_addr, dir_states[lookup_index], dir_presence[lookup_index], dir_tip_state[lookup_index]);
+                end else begin
+                    $display("[DIR DEBUG] MISS addr=%h: returning INVALID", lookup_addr);
                 end
-                
-                STATE_LOOKUP: begin
-                    // Perform directory lookup
-                    if (dir_valid[get_index(req_addr)] && dir_tags[get_index(req_addr)] == get_tag(req_addr)) begin
-                        // Directory hit
-                        lookup_valid <= 1'b1;
-                        lookup_state <= dir_states[get_index(req_addr)];
-                        lookup_presence <= dir_presence[get_index(req_addr)];
-                        lookup_tip_state <= dir_tip_state[get_index(req_addr)];
-                        $display("[DIR DEBUG] HIT addr=%h: state=%b, presence=%b, tip_state=%b", 
-                                 req_addr, dir_states[get_index(req_addr)], dir_presence[get_index(req_addr)], dir_tip_state[get_index(req_addr)]);
-                    end
-                    else begin
-                        // Directory miss (entry not present)
-                        lookup_valid <= 1'b1;
-                        lookup_state <= DIR_STATE_INVALID;
-                        lookup_presence <= 2'b00;
-                        lookup_tip_state <= 2'b00;
-                        $display("[DIR DEBUG] MISS addr=%h: returning INVALID", req_addr);
-                    end
-                end
-                
-                STATE_UPDATE: begin
-                    // Perform directory update
-                    dir_valid[get_index(req_addr)] <= 1'b1;
-                    dir_tags[get_index(req_addr)] <= get_tag(req_addr);
-                    dir_states[get_index(req_addr)] <= update_state;
-                    dir_presence[get_index(req_addr)] <= update_presence;
-                    dir_tip_state[get_index(req_addr)] <= update_tip_state;
-                    
-                    $display("[DIR DEBUG] UPDATE addr=%h: state=%b, presence=%b, tip_state=%b", 
-                             req_addr, update_state, update_presence, update_tip_state);
-                    
-                    // Signal update completion
-                    update_done <= 1'b1;
-                end
-                
-                default: begin
-                    // Invalid state - do nothing, stay in current state
-                end
-            endcase
+            end
         end
-    end
-    
-    // Next state logic
-    always @(*) begin
-        // Default next state
-        next_state = state;
-        
-        case (state)
-            STATE_IDLE: begin
-                if (lookup_req) begin
-                    next_state = STATE_LOOKUP;
-                end
-                else if (update_req) begin
-                    next_state = STATE_UPDATE;
-                end
-            end
-            
-            STATE_LOOKUP: begin
-                next_state = STATE_IDLE;
-            end
-            
-            STATE_UPDATE: begin
-                next_state = STATE_IDLE;
-            end
-            
-            default: begin
-                // Invalid state - return to IDLE
-                next_state = STATE_IDLE;
-            end
-        endcase
     end
 
 endmodule 

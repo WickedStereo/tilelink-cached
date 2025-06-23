@@ -111,7 +111,6 @@ module simple_probe_test (
         .l2_response_data(l2_response_data),
         .l2_response_error(l2_response_error)
     );
-    /* verilator lint_on PINMISSING */
     
     // Simple L2 memory model
     reg [255:0] memory [0:1023];

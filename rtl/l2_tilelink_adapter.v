@@ -1,7 +1,8 @@
 // =============================================================================
 // Project: TileLink Inclusive Directory Coherence (TIDC) System
-// Module: L2 TileLink Adapter
+// Module: L2 TileLink Adapter - Simplified for 2 Masters
 // Description: Central TileLink Slave Agent and coherence manager for the TIDC system
+//              Simplified version with explicit signals instead of packed arrays
 // =============================================================================
 
 // Include shared parameter definitions
@@ -11,17 +12,24 @@ module l2_tilelink_adapter (
     input  wire                         clk,
     input  wire                         rst_n,
     
-    // Direct probe interfaces to L1 adapters
-    output wire [1:0]                   l1_probe_req_valid,
-    output wire [127:0]                 l1_probe_req_addr,     // 2 * 64 bits
-    output wire [5:0]                   l1_probe_req_permissions, // 2 * 3 bits
+    // Direct probe interfaces to L1 adapters (simplified for 2 masters)
+    output wire                         l1_0_probe_req_valid,
+    output wire                         l1_1_probe_req_valid,
+    output wire [63:0]                  l1_0_probe_req_addr,
+    output wire [63:0]                  l1_1_probe_req_addr,
+    output wire [2:0]                   l1_0_probe_req_permissions,
+    output wire [2:0]                   l1_1_probe_req_permissions,
     
-    input  wire [1:0]                   l1_probe_ack_valid,
-    input  wire [127:0]                 l1_probe_ack_addr,     // 2 * 64 bits
-    input  wire [5:0]                   l1_probe_ack_permissions, // 2 * 3 bits
-    input  wire [1023:0]                l1_probe_ack_dirty_data, // 2 * 512 bits
+    input  wire                         l1_0_probe_ack_valid,
+    input  wire                         l1_1_probe_ack_valid,
+    input  wire [63:0]                  l1_0_probe_ack_addr,
+    input  wire [63:0]                  l1_1_probe_ack_addr,
+    input  wire [2:0]                   l1_0_probe_ack_permissions,
+    input  wire [2:0]                   l1_1_probe_ack_permissions,
+    input  wire [511:0]                 l1_0_probe_ack_dirty_data,
+    input  wire [511:0]                 l1_1_probe_ack_dirty_data,
     
-    // TileLink Channel A (requests from L1s)
+    // TileLink Channel A (requests from L1s) - Keep packed for backward compatibility
     input  wire [1:0]                   a_valid,
     input  wire [5:0]                   a_opcode,  // Packed array of opcodes from each master (2*3)
     input  wire [5:0]                   a_param,   // Packed array of params from each master (2*3)
@@ -32,18 +40,27 @@ module l2_tilelink_adapter (
     input  wire [127:0]                 a_mask,    // Packed array of masks from each master (2*64)
     output wire [1:0]                   a_ready,
     
-    // TileLink Channel B (probes to L1s)
-    output reg  [1:0]                   b_valid,
-    output reg  [5:0]                   b_opcode,  // Packed array of opcodes to each master (2*3)
-    output reg  [5:0]                   b_param,   // Packed array of params to each master (2*3)
-    output reg  [7:0]                   b_size,    // Packed array of sizes to each master (2*4)
-    output reg  [7:0]                   b_source,  // Packed array of source IDs to each master (2*4)
-    output reg  [127:0]                 b_address, // Packed array of addresses to each master (2*64)
-    output reg  [1023:0]                b_data,    // Packed array of data to each master (2*512)
-    output reg  [127:0]                 b_mask,    // Packed array of masks to each master (2*64)
-    input  wire [1:0]                   b_ready,
+    // TileLink Channel B (probes to L1s) - Simplified individual signals
+    output reg                          b_0_valid,
+    output reg                          b_1_valid,
+    output reg  [2:0]                   b_0_opcode,
+    output reg  [2:0]                   b_1_opcode,
+    output reg  [2:0]                   b_0_param,
+    output reg  [2:0]                   b_1_param,
+    output reg  [3:0]                   b_0_size,
+    output reg  [3:0]                   b_1_size,
+    output reg  [3:0]                   b_0_source,
+    output reg  [3:0]                   b_1_source,
+    output reg  [63:0]                  b_0_address,
+    output reg  [63:0]                  b_1_address,
+    output reg  [511:0]                 b_0_data,
+    output reg  [511:0]                 b_1_data,
+    output reg  [63:0]                  b_0_mask,
+    output reg  [63:0]                  b_1_mask,
+    input  wire                         b_0_ready,
+    input  wire                         b_1_ready,
     
-    // TileLink Channel C (responses from L1s)
+    // TileLink Channel C (responses from L1s) - Keep packed for backward compatibility
     input  wire [1:0]                   c_valid,
     input  wire [5:0]                   c_opcode,  // Packed array of opcodes from each master (2*3)
     input  wire [5:0]                   c_param,   // Packed array of params from each master (2*3)
@@ -54,18 +71,27 @@ module l2_tilelink_adapter (
     input  wire [1:0]                   c_error,   // Packed array of error flags from each master
     output wire [1:0]                   c_ready,
     
-    // TileLink Channel D (responses to L1s)
-    output reg  [1:0]                   d_valid,
-    output reg  [5:0]                   d_opcode,  // Packed array of opcodes to each master (2*3)
-    output reg  [5:0]                   d_param,   // Packed array of params to each master (2*3)
-    output reg  [7:0]                   d_size,    // Packed array of sizes to each master (2*4)
-    output reg  [7:0]                   d_source,  // Packed array of source IDs to each master (2*4)
-    output reg  [7:0]                   d_sink,    // Packed array of sink IDs to each master (2*4)
-    output reg  [1023:0]                d_data,    // Packed array of data to each master (2*512)
-    output reg  [1:0]                   d_error,   // Packed array of error flags to each master
-    input  wire [1:0]                   d_ready,
+    // TileLink Channel D (responses to L1s) - Simplified individual signals
+    output reg                          d_0_valid,
+    output reg                          d_1_valid,
+    output reg  [2:0]                   d_0_opcode,
+    output reg  [2:0]                   d_1_opcode,
+    output reg  [2:0]                   d_0_param,
+    output reg  [2:0]                   d_1_param,
+    output reg  [3:0]                   d_0_size,
+    output reg  [3:0]                   d_1_size,
+    output reg  [3:0]                   d_0_source,
+    output reg  [3:0]                   d_1_source,
+    output reg  [3:0]                   d_0_sink,
+    output reg  [3:0]                   d_1_sink,
+    output reg  [511:0]                 d_0_data,
+    output reg  [511:0]                 d_1_data,
+    output reg                          d_0_error,
+    output reg                          d_1_error,
+    input  wire                         d_0_ready,
+    input  wire                         d_1_ready,
     
-    // TileLink Channel E (acknowledgements from L1s)
+    // TileLink Channel E (acknowledgements from L1s) - Keep packed for simplicity
     input  wire [1:0]                   e_valid,
     input  wire [7:0]                   e_sink,    // Packed array of sink IDs from each master (2*4)
     output wire [1:0]                   e_ready,
@@ -82,6 +108,63 @@ module l2_tilelink_adapter (
     input  wire [511:0]                 l2_response_data,  // Data from L2 cache for read responses
     input  wire                         l2_response_error   // Error status from L2 cache
 );
+
+    // Convert individual signals back to packed arrays for backward compatibility
+    wire [1:0] b_valid = {b_1_valid, b_0_valid};
+    wire [5:0] b_opcode = {b_1_opcode, b_0_opcode};
+    wire [5:0] b_param = {b_1_param, b_0_param};
+    wire [7:0] b_size = {b_1_size, b_0_size};
+    wire [7:0] b_source = {b_1_source, b_0_source};
+    wire [127:0] b_address = {b_1_address, b_0_address};
+    wire [1023:0] b_data = {b_1_data, b_0_data};
+    wire [127:0] b_mask = {b_1_mask, b_0_mask};
+    wire [1:0] b_ready = {b_1_ready, b_0_ready};
+    
+    wire [1:0] d_valid = {d_1_valid, d_0_valid};
+    wire [5:0] d_opcode = {d_1_opcode, d_0_opcode};
+    wire [5:0] d_param = {d_1_param, d_0_param};
+    wire [7:0] d_size = {d_1_size, d_0_size};
+    wire [7:0] d_source = {d_1_source, d_0_source};
+    wire [7:0] d_sink = {d_1_sink, d_0_sink};
+    wire [1023:0] d_data = {d_1_data, d_0_data};
+    wire [1:0] d_error = {d_1_error, d_0_error};
+    wire [1:0] d_ready = {d_1_ready, d_0_ready};
+    
+    // Convert back to packed arrays for probe signals
+    wire [1:0] l1_probe_req_valid = {l1_1_probe_req_valid, l1_0_probe_req_valid};
+    wire [127:0] l1_probe_req_addr = {l1_1_probe_req_addr, l1_0_probe_req_addr};
+    wire [5:0] l1_probe_req_permissions = {l1_1_probe_req_permissions, l1_0_probe_req_permissions};
+    
+    wire [1:0] l1_probe_ack_valid = {l1_1_probe_ack_valid, l1_0_probe_ack_valid};
+    wire [127:0] l1_probe_ack_addr = {l1_1_probe_ack_addr, l1_0_probe_ack_addr};
+    wire [5:0] l1_probe_ack_permissions = {l1_1_probe_ack_permissions, l1_0_probe_ack_permissions};
+    wire [1023:0] l1_probe_ack_dirty_data = {l1_1_probe_ack_dirty_data, l1_0_probe_ack_dirty_data};
+
+    // Simplified request extraction helper signals
+    wire [2:0] a_0_opcode = a_opcode[2:0];
+    wire [2:0] a_1_opcode = a_opcode[5:3];
+    wire [2:0] a_0_param = a_param[2:0];
+    wire [2:0] a_1_param = a_param[5:3];
+    wire [3:0] a_0_source = a_source[3:0];
+    wire [3:0] a_1_source = a_source[7:4];
+    wire [63:0] a_0_address = a_address[63:0];
+    wire [63:0] a_1_address = a_address[127:64];
+    wire [511:0] a_0_data = a_data[511:0];
+    wire [511:0] a_1_data = a_data[1023:512];
+    
+    wire [2:0] c_0_opcode = c_opcode[2:0];
+    wire [2:0] c_1_opcode = c_opcode[5:3];
+    wire [2:0] c_0_param = c_param[2:0];
+    wire [2:0] c_1_param = c_param[5:3];
+    wire [3:0] c_0_source = c_source[3:0];
+    wire [3:0] c_1_source = c_source[7:4];
+    wire [63:0] c_0_address = c_address[63:0];
+    wire [63:0] c_1_address = c_address[127:64];
+    wire [511:0] c_0_data = c_data[511:0];
+    wire [511:0] c_1_data = c_data[1023:512];
+    
+    wire [3:0] e_0_sink = e_sink[3:0];
+    wire [3:0] e_1_sink = e_sink[7:4];
 
     // Define internal components and signals
     
@@ -140,6 +223,8 @@ module l2_tilelink_adapter (
     reg [2:0]                  pending_param;
     reg [3:0]                  pending_source;
     reg [3:0]                  pending_sink;
+    reg [3:0]                  sent_sink_id;      // Sink ID that was actually sent in Grant
+    reg                        sink_allocated;    // Flag to prevent double allocation
     reg [511:0]                pending_data;
     
     // Latched directory lookup results
@@ -157,8 +242,7 @@ module l2_tilelink_adapter (
     reg [511:0]                l2_response_data_buf;
     reg                        l2_response_error_buf;
     
-    // Integer variables for loops
-    integer i, j;
+    // Integer variables (no longer needed with simplified logic)
     
     // Simple 2-Master Arbiter instantiation
     simple_arbiter request_arbiter (
@@ -207,21 +291,26 @@ module l2_tilelink_adapter (
         .dealloc_sink_id(sink_id_dealloc_sink_id)
     );
     
-    // Control logic for Sink ID allocation
-    assign sink_id_alloc_req = (state == STATE_GRANT_SEND) && !d_valid[pending_master_id] && (l2_response_valid || l2_response_buffered);
-    assign sink_id_dealloc_req = (state == STATE_GRANTACK_WAIT) && e_valid[pending_master_id] && 
-                               (e_sink[pending_master_id*4 +: 4] == pending_sink);
+    // Control logic for Sink ID allocation - simplified
+    // Only allocate once per GRANT_SEND state entry
+    assign sink_id_alloc_req = (state == STATE_GRANT_SEND) && 
+                              ((pending_master_id == 0 && !d_0_valid) || (pending_master_id == 1 && !d_1_valid)) && 
+                              (l2_response_valid || l2_response_buffered) &&
+                              !sink_allocated; // Only if no sink ID has been allocated yet for this transaction
+    assign sink_id_dealloc_req = (state == STATE_GRANTACK_WAIT) && 
+                               ((pending_master_id == 0 && e_valid[0] && e_0_sink == sent_sink_id) ||
+                                (pending_master_id == 1 && e_valid[1] && e_1_sink == sent_sink_id));
 
-    // Probe signal generation
-    genvar k;
-    generate
-        for (k = 0; k < 2; k = k + 1) begin : gen_probe_signals
-            assign l1_probe_req_valid[k] = (state == STATE_PROBE_SEND) && probe_sent[k] && !probe_acked[k];
-            assign l1_probe_req_addr[k*64 +: 64] = (l1_probe_req_valid[k]) ? pending_addr : 64'b0;
-            assign l1_probe_req_permissions[k*3 +: 3] = (l1_probe_req_valid[k]) ? 
-                ((pending_param == PARAM_NtoT || pending_param == PARAM_BtoT) ? PARAM_toN : PARAM_toB) : 3'b0;
-        end
-    endgenerate
+    // Simplified probe signal generation for 2 masters
+    assign l1_0_probe_req_valid = (state == STATE_PROBE_SEND) && probe_sent[0] && !probe_acked[0];
+    assign l1_1_probe_req_valid = (state == STATE_PROBE_SEND) && probe_sent[1] && !probe_acked[1];
+    
+    assign l1_0_probe_req_addr = l1_0_probe_req_valid ? pending_addr : 64'b0;
+    assign l1_1_probe_req_addr = l1_1_probe_req_valid ? pending_addr : 64'b0;
+    
+    wire [2:0] probe_permissions = (pending_param == PARAM_NtoT || pending_param == PARAM_BtoT) ? PARAM_toN : PARAM_toB;
+    assign l1_0_probe_req_permissions = l1_0_probe_req_valid ? probe_permissions : 3'b0;
+    assign l1_1_probe_req_permissions = l1_1_probe_req_valid ? probe_permissions : 3'b0;
     
     // Connect to arbiter - ready when we can accept a new request
     // Only ready when in IDLE state to prevent overlapping transactions
@@ -254,6 +343,8 @@ module l2_tilelink_adapter (
             pending_param <= 3'b000;
             pending_source <= 4'b0;
             pending_sink <= 4'b0;
+            sent_sink_id <= 4'b0;
+            sink_allocated <= 1'b0;
             pending_data <= 512'b0;
             
             // Reset probe tracking
@@ -290,24 +381,40 @@ module l2_tilelink_adapter (
             l2_cmd_size <= 4'b0;
             l2_cmd_dirty <= 1'b0;
             
-            // Reset TileLink outputs
-            b_valid <= 2'b0;
-            b_opcode <= 6'b0;
-            b_param <= 6'b0;
-            b_size <= 8'b0;
-            b_source <= 8'b0;
-            b_address <= 128'b0;
-            b_data <= 1024'b0;
-            b_mask <= 128'b0;
+            // Reset TileLink outputs - simplified for individual signals
+            b_0_valid <= 1'b0;
+            b_1_valid <= 1'b0;
+            b_0_opcode <= 3'b0;
+            b_1_opcode <= 3'b0;
+            b_0_param <= 3'b0;
+            b_1_param <= 3'b0;
+            b_0_size <= 4'b0;
+            b_1_size <= 4'b0;
+            b_0_source <= 4'b0;
+            b_1_source <= 4'b0;
+            b_0_address <= 64'b0;
+            b_1_address <= 64'b0;
+            b_0_data <= 512'b0;
+            b_1_data <= 512'b0;
+            b_0_mask <= 64'b0;
+            b_1_mask <= 64'b0;
             
-            d_valid <= 2'b0;
-            d_opcode <= 6'b0;
-            d_param <= 6'b0;
-            d_size <= 8'b0;
-            d_source <= 8'b0;
-            d_sink <= 8'b0;
-            d_data <= 1024'b0;
-            d_error <= 2'b0;
+            d_0_valid <= 1'b0;
+            d_1_valid <= 1'b0;
+            d_0_opcode <= 3'b0;
+            d_1_opcode <= 3'b0;
+            d_0_param <= 3'b0;
+            d_1_param <= 3'b0;
+            d_0_size <= 4'b0;
+            d_1_size <= 4'b0;
+            d_0_source <= 4'b0;
+            d_1_source <= 4'b0;
+            d_0_sink <= 4'b0;
+            d_1_sink <= 4'b0;
+            d_0_data <= 512'b0;
+            d_1_data <= 512'b0;
+            d_0_error <= 1'b0;
+            d_1_error <= 1'b0;
             
             sink_id_dealloc_sink_id <= 4'b0;
         end
@@ -316,8 +423,10 @@ module l2_tilelink_adapter (
             dir_lookup_req <= 1'b0;
             dir_update_req <= 1'b0;
             l2_cmd_valid <= 1'b0;
-            b_valid <= 2'b0;
-            d_valid <= 2'b0;
+            b_0_valid <= 1'b0;
+            b_1_valid <= 1'b0;
+            d_0_valid <= 1'b0;
+            d_1_valid <= 1'b0;
             
             // State machine transitions
             state <= next_state;
@@ -343,6 +452,9 @@ module l2_tilelink_adapter (
             // Clear buffer when returning to IDLE
             else if (next_state == STATE_IDLE) begin
                 l2_response_buffered <= 1'b0;
+                pending_sink <= 4'b0; // Reset sink ID for next transaction
+                sent_sink_id <= 4'b0; // Reset sent sink ID for next transaction
+                sink_allocated <= 1'b0; // Reset allocation flag for next transaction
                 $display("[L2 DEBUG] Clearing L2 response buffer");
             end
             
@@ -354,22 +466,36 @@ module l2_tilelink_adapter (
                         // Save request details
                         pending_master_id <= arb_master_id;
                         
-                        // Extract information based on channel
+                        // Simplified channel extraction for 2 masters
                         if (arb_channel == 2'b00) begin // Channel A
-                            // Extract Channel A signals for the selected master
-                            pending_addr <= a_address[arb_master_id*64 +: 64];
-                            pending_opcode <= a_opcode[arb_master_id*3 +: 3];
-                            pending_param <= a_param[arb_master_id*3 +: 3];
-                            pending_source <= a_source[arb_master_id*4 +: 4];
-                            pending_data <= a_data[arb_master_id*512 +: 512];
+                            if (arb_master_id == 0) begin
+                                pending_addr <= a_0_address;
+                                pending_opcode <= a_0_opcode;
+                                pending_param <= a_0_param;
+                                pending_source <= a_0_source;
+                                pending_data <= a_0_data;
+                            end else begin
+                                pending_addr <= a_1_address;
+                                pending_opcode <= a_1_opcode;
+                                pending_param <= a_1_param;
+                                pending_source <= a_1_source;
+                                pending_data <= a_1_data;
+                            end
                         end
                         else begin // Channel C
-                            // Extract Channel C signals for the selected master
-                            pending_addr <= c_address[arb_master_id*64 +: 64];
-                            pending_opcode <= c_opcode[arb_master_id*3 +: 3];
-                            pending_param <= c_param[arb_master_id*3 +: 3];
-                            pending_source <= c_source[arb_master_id*4 +: 4];
-                            pending_data <= c_data[arb_master_id*512 +: 512];
+                            if (arb_master_id == 0) begin
+                                pending_addr <= c_0_address;
+                                pending_opcode <= c_0_opcode;
+                                pending_param <= c_0_param;
+                                pending_source <= c_0_source;
+                                pending_data <= c_0_data;
+                            end else begin
+                                pending_addr <= c_1_address;
+                                pending_opcode <= c_1_opcode;
+                                pending_param <= c_1_param;
+                                pending_source <= c_1_source;
+                                pending_data <= c_1_data;
+                            end
                         end
                     end
                 end
@@ -419,22 +545,34 @@ module l2_tilelink_adapter (
                 end
                 
                 STATE_PROBE_WAIT: begin
-                                          // Check for incoming probe acknowledgments from L1 adapters
-                      for (j = 0; j < 2; j = j + 1) begin
-                        if (l1_probe_ack_valid[j] && l1_probe_ack_addr[j*64 +: 64] == pending_addr && probe_sent[j]) begin
-                            // Mark this L1 as having responded
-                            probe_acked[j] <= 1'b1;
-                            
-                            // If probe ack indicates dirty data, write it to L2 cache
-                            if (l1_probe_ack_permissions[j*3 +: 3] == PARAM_TtoN || 
-                                l1_probe_ack_permissions[j*3 +: 3] == PARAM_TtoB) begin
-                                l2_cmd_valid <= 1'b1;
-                                l2_cmd_type <= L2_CMD_WRITE_BACK;
-                                l2_cmd_addr <= pending_addr;
-                                l2_cmd_data <= l1_probe_ack_dirty_data[j*512 +: 512];
-                                l2_cmd_size <= 4'($clog2(256/8));
-                                l2_cmd_dirty <= 1'b1;
-                            end
+                    // Simplified probe acknowledgment handling for 2 masters
+                    // Handle L1_0 probe ack
+                    if (l1_0_probe_ack_valid && l1_0_probe_ack_addr == pending_addr && probe_sent[0]) begin
+                        probe_acked[0] <= 1'b1;
+                        
+                        // If probe ack indicates dirty data, write it to L2 cache
+                        if (l1_0_probe_ack_permissions == PARAM_TtoN || l1_0_probe_ack_permissions == PARAM_TtoB) begin
+                            l2_cmd_valid <= 1'b1;
+                            l2_cmd_type <= L2_CMD_WRITE_BACK;
+                            l2_cmd_addr <= pending_addr;
+                            l2_cmd_data <= l1_0_probe_ack_dirty_data;
+                            l2_cmd_size <= L2_ACCESS_SIZE_FIELD[3:0];
+                            l2_cmd_dirty <= 1'b1;
+                        end
+                    end
+                    
+                    // Handle L1_1 probe ack
+                    if (l1_1_probe_ack_valid && l1_1_probe_ack_addr == pending_addr && probe_sent[1]) begin
+                        probe_acked[1] <= 1'b1;
+                        
+                        // If probe ack indicates dirty data, write it to L2 cache
+                        if (l1_1_probe_ack_permissions == PARAM_TtoN || l1_1_probe_ack_permissions == PARAM_TtoB) begin
+                            l2_cmd_valid <= 1'b1;
+                            l2_cmd_type <= L2_CMD_WRITE_BACK;
+                            l2_cmd_addr <= pending_addr;
+                            l2_cmd_data <= l1_1_probe_ack_dirty_data;
+                            l2_cmd_size <= L2_ACCESS_SIZE_FIELD[3:0];
+                            l2_cmd_dirty <= 1'b1;
                         end
                     end
                 end
@@ -446,29 +584,44 @@ module l2_tilelink_adapter (
                         l2_cmd_type <= L2_CMD_READ;
                         l2_cmd_addr <= pending_addr;
                         l2_cmd_data <= 512'b0;
-                        l2_cmd_size <= 4'($clog2(256/8));
+                        l2_cmd_size <= L2_ACCESS_SIZE_FIELD[3:0];
                         l2_cmd_dirty <= 1'b0;
                     end
                 end
                 
                 STATE_GRANT_SEND: begin
-                    // Send Grant/GrantData to the requesting L1 - only if not already sent
-                    $display("[L2 DEBUG] GRANT_SEND: master_id=%d, l2_valid=%b, buffered=%b, sink_gnt=%b, d_valid=%b", 
-                             pending_master_id, l2_response_valid, l2_response_buffered, sink_id_alloc_gnt, d_valid[pending_master_id]);
-                    if ((l2_response_valid || l2_response_buffered) && sink_id_alloc_gnt && !d_valid[pending_master_id]) begin
+                    // Simplified Grant/GrantData sending for 2 masters
+                    $display("[L2 DEBUG] GRANT_SEND: master_id=%d, l2_valid=%b, buffered=%b, sink_gnt=%b, d_0_valid=%b", 
+                             pending_master_id, l2_response_valid, l2_response_buffered, sink_id_alloc_gnt, d_0_valid);
+                    
+                    if ((l2_response_valid || l2_response_buffered) && sink_id_alloc_gnt) begin
+                        $display("[L2 DEBUG] Allocating sink_id=%d, storing in pending_sink", sink_id_alloc_sink_id);
                         pending_sink <= sink_id_alloc_sink_id;
+                        sink_allocated <= 1'b1; // Mark that allocation has happened
                         
-                        d_valid[pending_master_id] <= 1'b1;
-                        d_opcode[pending_master_id*3 +: 3] <= D_OPCODE_GRANT_DATA;
-                        d_param[pending_master_id*3 +: 3] <= pending_param; // Grant the requested permissions
-                        d_size[pending_master_id*4 +: 4] <= 4'($clog2(256/8));
-                        d_source[pending_master_id*4 +: 4] <= pending_source;
-                        d_sink[pending_master_id*4 +: 4] <= sink_id_alloc_sink_id;
-                        // Use buffered data if available, otherwise direct L2 response
-                        d_data[pending_master_id*512 +: 512] <= l2_response_buffered ? l2_response_data_buf : l2_response_data;
-                        d_error[pending_master_id] <= l2_response_buffered ? l2_response_error_buf : l2_response_error;
-                        $display("[L2 DEBUG] Grant sent to L1_%d: data=%h", pending_master_id, 
-                                 l2_response_buffered ? l2_response_data_buf[63:0] : l2_response_data[63:0]);
+                        if (pending_master_id == 0 && !d_0_valid) begin
+                            d_0_valid <= 1'b1;
+                            d_0_opcode <= D_OPCODE_GRANT_DATA;
+                            d_0_param <= pending_param; // Grant the requested permissions
+                            d_0_size <= L2_ACCESS_SIZE_FIELD[3:0];
+                            d_0_source <= pending_source;
+                            d_0_sink <= sink_id_alloc_sink_id;
+                            sent_sink_id <= sink_id_alloc_sink_id; // Store the sink ID we actually sent
+                            d_0_data <= l2_response_buffered ? l2_response_data_buf : l2_response_data;
+                            d_0_error <= l2_response_buffered ? l2_response_error_buf : l2_response_error;
+                            $display("[L2 DEBUG] Grant sent to L1_0 with sink_id=%d, pending_sink=%d", sink_id_alloc_sink_id, pending_sink);
+                        end else if (pending_master_id == 1 && !d_1_valid) begin
+                            d_1_valid <= 1'b1;
+                            d_1_opcode <= D_OPCODE_GRANT_DATA;
+                            d_1_param <= pending_param; // Grant the requested permissions
+                            d_1_size <= L2_ACCESS_SIZE_FIELD[3:0];
+                            d_1_source <= pending_source;
+                            d_1_sink <= sink_id_alloc_sink_id;
+                            sent_sink_id <= sink_id_alloc_sink_id; // Store the sink ID we actually sent
+                            d_1_data <= l2_response_buffered ? l2_response_data_buf : l2_response_data;
+                            d_1_error <= l2_response_buffered ? l2_response_error_buf : l2_response_error;
+                            $display("[L2 DEBUG] Grant sent to L1_1 with sink_id=%d", sink_id_alloc_sink_id);
+                        end
                     end
                 end
                 
@@ -480,7 +633,7 @@ module l2_tilelink_adapter (
                         l2_cmd_type <= L2_CMD_WRITE_BACK;
                         l2_cmd_addr <= pending_addr;
                         l2_cmd_data <= pending_data;
-                        l2_cmd_size <= 4'($clog2(256/8));
+                        l2_cmd_size <= L2_ACCESS_SIZE_FIELD[3:0];
                         l2_cmd_dirty <= 1'b1;
                     end
                     
@@ -508,22 +661,35 @@ module l2_tilelink_adapter (
                 end
                 
                 STATE_RELEASEACK_SEND: begin
-                    // Send ReleaseAck to the L1
-                    d_valid[pending_master_id] <= 1'b1;
-                    d_opcode[pending_master_id*3 +: 3] <= D_OPCODE_RELEASE_ACK;
-                    d_param[pending_master_id*3 +: 3] <= 3'b000;
-                    d_size[pending_master_id*4 +: 4] <= 4'($clog2(256/8));
-                    d_source[pending_master_id*4 +: 4] <= pending_source;
-                    d_sink[pending_master_id*4 +: 4] <= {4{1'b0}};
-                    d_data[pending_master_id*512 +: 512] <= {512{1'b0}};
-                    d_error[pending_master_id] <= 1'b0;
+                    // Simplified ReleaseAck sending for 2 masters
+                    if (pending_master_id == 0) begin
+                        d_0_valid <= 1'b1;
+                        d_0_opcode <= D_OPCODE_RELEASE_ACK;
+                        d_0_param <= 3'b000;
+                        d_0_size <= L2_ACCESS_SIZE_FIELD[3:0];
+                        d_0_source <= pending_source;
+                        d_0_sink <= 4'b0;
+                        d_0_data <= 512'b0;
+                        d_0_error <= 1'b0;
+                    end else begin
+                        d_1_valid <= 1'b1;
+                        d_1_opcode <= D_OPCODE_RELEASE_ACK;
+                        d_1_param <= 3'b000;
+                        d_1_size <= L2_ACCESS_SIZE_FIELD[3:0];
+                        d_1_source <= pending_source;
+                        d_1_sink <= 4'b0;
+                        d_1_data <= 512'b0;
+                        d_1_error <= 1'b0;
+                    end
                 end
                 
                 STATE_GRANTACK_WAIT: begin
-                    // Wait for GrantAck and update directory when received
-                    if (e_valid[pending_master_id] && 
-                        e_sink[pending_master_id*4 +: 4] == pending_sink) begin
-                        
+                    // Simplified GrantAck waiting for 2 masters
+                    $display("[L2 DEBUG] GRANTACK_WAIT: pending_master_id=%d, e_valid=%b, e_0_sink=%d, e_1_sink=%d, sent_sink_id=%d", 
+                             pending_master_id, e_valid, e_0_sink, e_1_sink, sent_sink_id);
+                    if ((pending_master_id == 0 && e_valid[0] && e_0_sink == sent_sink_id) ||
+                        (pending_master_id == 1 && e_valid[1] && e_1_sink == sent_sink_id)) begin
+                        $display("[L2 DEBUG] GrantAck received! Updating directory and going to IDLE");
                         // Update directory with new state
                         dir_update_req <= 1'b1;
                         dir_update_addr <= pending_addr;
@@ -541,7 +707,7 @@ module l2_tilelink_adapter (
                         end
                         
                         // Deallocate sink ID
-                        sink_id_dealloc_sink_id <= pending_sink;
+                        sink_id_dealloc_sink_id <= sent_sink_id;
                     end
                 end
                 
@@ -552,8 +718,8 @@ module l2_tilelink_adapter (
                         l2_cmd_valid <= 1'b1;
                         l2_cmd_type <= L2_CMD_READ;
                         l2_cmd_addr <= pending_addr;
-                        l2_cmd_data <= {512{1'b0}};
-                        l2_cmd_size <= 4'($clog2(256/8));
+                        l2_cmd_data <= 512'b0;
+                        l2_cmd_size <= L2_ACCESS_SIZE_FIELD[3:0];
                         l2_cmd_dirty <= 1'b0;
                     end
                     else if (pending_opcode == A_OPCODE_PUT_FULL_DATA) begin
@@ -562,18 +728,29 @@ module l2_tilelink_adapter (
                         l2_cmd_type <= L2_CMD_WRITE;
                         l2_cmd_addr <= pending_addr;
                         l2_cmd_data <= pending_data;
-                        l2_cmd_size <= 4'($clog2(256/8));
+                        l2_cmd_size <= L2_ACCESS_SIZE_FIELD[3:0];
                         l2_cmd_dirty <= 1'b1;
                         
-                        // Send immediate AccessAck for writes
-                        d_valid[pending_master_id] <= 1'b1;
-                        d_opcode[pending_master_id*3 +: 3] <= D_OPCODE_ACCESS_ACK;
-                        d_param[pending_master_id*3 +: 3] <= 3'b000;
-                        d_size[pending_master_id*4 +: 4] <= 4'($clog2(256/8));
-                        d_source[pending_master_id*4 +: 4] <= pending_source;
-                        d_sink[pending_master_id*4 +: 4] <= {4{1'b0}};
-                        d_data[pending_master_id*512 +: 512] <= {512{1'b0}};
-                        d_error[pending_master_id] <= l2_response_error;
+                        // Simplified AccessAck sending for 2 masters
+                        if (pending_master_id == 0) begin
+                            d_0_valid <= 1'b1;
+                            d_0_opcode <= D_OPCODE_ACCESS_ACK;
+                            d_0_param <= 3'b000;
+                            d_0_size <= L2_ACCESS_SIZE_FIELD[3:0];
+                            d_0_source <= pending_source;
+                            d_0_sink <= 4'b0;
+                            d_0_data <= 512'b0;
+                            d_0_error <= l2_response_error;
+                        end else begin
+                            d_1_valid <= 1'b1;
+                            d_1_opcode <= D_OPCODE_ACCESS_ACK;
+                            d_1_param <= 3'b000;
+                            d_1_size <= L2_ACCESS_SIZE_FIELD[3:0];
+                            d_1_source <= pending_source;
+                            d_1_sink <= 4'b0;
+                            d_1_data <= 512'b0;
+                            d_1_error <= l2_response_error;
+                        end
                     end
                 end
                 
@@ -658,9 +835,9 @@ module l2_tilelink_adapter (
             end
             
             STATE_GRANT_SEND: begin
-                $display("[L2 DEBUG] GRANT_SEND next: d_valid[%d]=%b, d_ready[%d]=%b", 
-                         pending_master_id, d_valid[pending_master_id], pending_master_id, d_ready[pending_master_id]);
-                if (d_valid[pending_master_id] && d_ready[pending_master_id]) begin
+                $display("[L2 DEBUG] GRANT_SEND next: master_id=%d", pending_master_id);
+                if ((pending_master_id == 0 && d_0_valid && d_0_ready) ||
+                    (pending_master_id == 1 && d_1_valid && d_1_ready)) begin
                     next_state = STATE_GRANTACK_WAIT;
                     $display("[L2 DEBUG] Going to GRANTACK_WAIT");
                 end
@@ -673,15 +850,18 @@ module l2_tilelink_adapter (
             end
             
             STATE_RELEASEACK_SEND: begin
-                if (d_valid[pending_master_id] && d_ready[pending_master_id]) begin
+                if ((pending_master_id == 0 && d_0_valid && d_0_ready) ||
+                    (pending_master_id == 1 && d_1_valid && d_1_ready)) begin
                     next_state = STATE_IDLE;
                 end
             end
             
             STATE_GRANTACK_WAIT: begin
-                if (e_valid[pending_master_id] && 
-                    e_sink[pending_master_id*4 +: 4] == pending_sink) begin
-                    next_state = STATE_IDLE;
+                if ((pending_master_id == 0 && e_valid[0] && e_0_sink == sent_sink_id) ||
+                    (pending_master_id == 1 && e_valid[1] && e_1_sink == sent_sink_id)) begin
+                    if (dir_update_done) begin
+                        next_state = STATE_IDLE;
+                    end
                 end
             end
             

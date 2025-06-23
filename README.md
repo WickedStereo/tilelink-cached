@@ -17,10 +17,10 @@ TIDC/
 │   └── tidc_params.v     # System parameters
 ├── tb/                   # Testbenches
 │   ├── simple_probe_test.v # Basic 2-L1 probe test
-│   └── two_master_test.v   # Complete 2-L1 test
+│   ├── two_master_test.v   # Complete 2-L1 test
 ├── cpp/                  # Verilator C++ drivers
 │   ├── main_simple_probe.cpp
-│   └── main_two_master.cpp
+│   ├── main_two_master.cpp
 ├── Makefile             # Build system
 ├── README.md
 └── .gitignore
@@ -31,7 +31,7 @@ TIDC/
 ### Building and Running Tests
 
 ```bash
-# Run the main 2-master test (default)
+# Run the comprehensive test suite (default)
 make
 
 # Run specific tests
@@ -46,6 +46,9 @@ make clean
 
 # Lint check
 make lint
+
+# Help
+make help
 ```
 
 ### Test Descriptions

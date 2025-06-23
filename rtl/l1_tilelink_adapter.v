@@ -142,30 +142,8 @@ module l1_tilelink_adapter (
     // Pending source IDs (for tracking multiple outstanding transactions)
     reg [3:0] pending_source_id;
     
-    // Source ID allocation logic - FIX: Remove circular dependency
-    // The key insight: allocation request should be independent of state transitions
-    // and we need to handle the ready signal properly
-    wire can_accept_new_request;
-    assign can_accept_new_request = (state == STATE_IDLE);
-    assign alloc_source_id_req = can_accept_new_request && l1_request_valid && !alloc_source_id_gnt;
-    
-    // Hold the source ID after allocation until transaction is complete
-    reg allocated_source_id_valid;
-    reg [3:0] allocated_source_id;
-    
-    always @(posedge clk or negedge rst_n) begin
-        if (!rst_n) begin
-            allocated_source_id_valid <= 1'b0;
-            allocated_source_id <= 4'b0;
-        end else begin
-            if (alloc_source_id_gnt && l1_request_valid && can_accept_new_request) begin
-                allocated_source_id_valid <= 1'b1;
-                allocated_source_id <= alloc_source_id;
-            end else if (dealloc_source_id_req) begin
-                allocated_source_id_valid <= 1'b0;
-            end
-        end
-    end
+    // Simplified source ID allocation logic
+    assign alloc_source_id_req = (state == STATE_IDLE) && l1_request_valid;
     
     assign dealloc_source_id_req = (state == STATE_ACQUIRE_WAIT && d_valid && 
                                    (d_opcode == D_OPCODE_GRANT || d_opcode == D_OPCODE_GRANT_DATA) && 
@@ -176,11 +154,11 @@ module l1_tilelink_adapter (
                                     (d_opcode == D_OPCODE_ACCESS_ACK || d_opcode == D_OPCODE_ACCESS_ACK_DATA) && 
                                      d_source == pending_source_id);
     
-    // Interface to L1 Cache Controller - FIX: Ready when we can accept and have allocated source ID
-    assign l1_request_ready = can_accept_new_request && (allocated_source_id_valid || alloc_source_id_gnt);
+    // Simplified ready signal - ready when idle and source ID available
+    assign l1_request_ready = (state == STATE_IDLE) && alloc_source_id_gnt;
     
     // Cache line size calculation for TileLink size field (log2 of bytes)
-    localparam CACHE_LINE_SIZE = $clog2(512 / 8);  // $clog2(64) = 6
+    localparam CACHE_LINE_SIZE = CACHE_LINE_SIZE_FIELD;  // $clog2(64) = 6
     
     // Sequential logic
     always @(posedge clk or negedge rst_n) begin
@@ -264,10 +242,13 @@ module l1_tilelink_adapter (
                         pending_req_type <= l1_request_type;
                         pending_permissions <= l1_request_permissions;
                         pending_data <= l1_request_data;
-                        pending_source_id <= allocated_source_id_valid ? allocated_source_id : alloc_source_id;
+                        pending_source_id <= alloc_source_id;  // Use directly from manager
                         
                         // Set data flag based on request type
                         pending_has_data <= (l1_request_type == L1_REQ_WRITE_BACK);
+                        
+                        // Prepare deallocation source ID for later use
+                        dealloc_source_id <= alloc_source_id;
                     end
                 end
                 
@@ -277,7 +258,7 @@ module l1_tilelink_adapter (
                     a_opcode <= A_OPCODE_ACQUIRE_BLOCK;
                     a_param <= pending_permissions; // NtoB, NtoT, BtoT
                     a_size <= CACHE_LINE_SIZE[3:0]; // Size of a cache line
-                    a_source <= pending_source_id;
+                    a_source <= pending_source_id;  // Use stored source ID for consistency
                     a_address <= pending_addr;
                     a_data <= 512'b0;  // No data for Acquire
                     a_mask <= 64'hFFFFFFFFFFFFFFFF;    // Full mask
@@ -293,6 +274,7 @@ module l1_tilelink_adapter (
                     if (d_valid && (d_opcode == D_OPCODE_GRANT || d_opcode == D_OPCODE_GRANT_DATA) && 
                         d_source == pending_source_id) begin
                         
+                        $display("[L1 DEBUG] Grant received: d_sink=%d, d_source=%d, pending_source=%d", d_sink, d_source, pending_source_id);
                         // Save the sink ID for the GrantAck
                         grant_sink <= d_sink;
                         
@@ -310,11 +292,13 @@ module l1_tilelink_adapter (
                 
                 STATE_GRANT_ACK_SEND: begin
                     // Send GrantAck on Channel E
+                    $display("[L1 DEBUG] Sending GrantAck: e_valid=1, e_sink=%d, e_ready=%b", grant_sink, e_ready);
                     e_valid <= 1'b1;
                     e_sink <= grant_sink;
                     
                     // If the message was accepted by the network
                     if (e_ready) begin
+                        $display("[L1 DEBUG] GrantAck accepted!");
                         // Nothing to do here, next_state logic handles the transition
                     end
                 end
@@ -325,7 +309,7 @@ module l1_tilelink_adapter (
                     c_opcode <= pending_has_data ? C_OPCODE_RELEASE_DATA : C_OPCODE_RELEASE;
                     c_param <= pending_permissions; // TtoN, BtoN
                     c_size <= CACHE_LINE_SIZE[3:0]; // Size of a cache line
-                    c_source <= pending_source_id;
+                    c_source <= pending_source_id;  // Use stored source ID for consistency
                     c_address <= pending_addr;
                     c_data <= pending_has_data ? pending_data : 512'b0;
                     c_error <= 1'b0;
@@ -412,7 +396,7 @@ module l1_tilelink_adapter (
                     
                     a_param <= 3'b000;  // No special parameters for uncached requests
                     a_size <= CACHE_LINE_SIZE[3:0]; // Size of a cache line
-                    a_source <= pending_source_id;
+                    a_source <= pending_source_id;  // Use stored source ID for consistency
                     a_address <= pending_addr;
                     
                     // If the message was accepted by the network

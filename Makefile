@@ -46,6 +46,7 @@ $(BUILD_DIR)/V$(TWO_MASTER_TB_MODULE): $(RTL_SOURCES) $(TWO_MASTER_TB_SOURCES)
 		$(TWO_MASTER_TB_SOURCES) $(RTL_SOURCES) \
 		--build -o V$(TWO_MASTER_TB_MODULE)
 
+
 # Run simple probe test
 simple-probe-test: $(BUILD_DIR)/V$(SIMPLE_PROBE_TB_MODULE)
 	@echo "Running simple probe test..."
@@ -55,6 +56,7 @@ simple-probe-test: $(BUILD_DIR)/V$(SIMPLE_PROBE_TB_MODULE)
 two-master-test: $(BUILD_DIR)/V$(TWO_MASTER_TB_MODULE)
 	@echo "Running two master test..."
 	cd $(BUILD_DIR) && ./V$(TWO_MASTER_TB_MODULE)
+
 
 # View waveforms (requires GTKWave)
 waves: simple-probe-test
@@ -80,7 +82,7 @@ lint: $(RTL_SOURCES)
 # Help
 help:
 	@echo "Available targets:"
-	@echo "  all              - Build and run two master test (default)"
+	@echo "  all              - Build and run comprehensive test (default)"
 	@echo "  simple-probe-test - Build and run simple probe test"
 	@echo "  two-master-test  - Build and run two master test"
 	@echo "  waves            - Run simple probe test and open waveforms"

@@ -22,7 +22,7 @@ module simple_arbiter (
     // Arbiter outputs
     output reg                      arb_valid,
     output reg  [1:0]               arb_channel,   // 0 = Channel A, 1 = Channel C
-    output reg  [0:0]               arb_master_id, // 0 or 1 for 2 masters
+    output reg                      arb_master_id, // 0 or 1 for 2 masters
     output wire [1:0]               arb_master_oh, // One-hot: [1:0] or [0:1]
     
     // Control
@@ -30,17 +30,17 @@ module simple_arbiter (
     output reg                      arb_busy
 );
 
-    // Convert master ID to one-hot
-    assign arb_master_oh = (arb_master_id == 1'b0) ? 2'b01 : 2'b10;
+    // Convert master ID to one-hot (simplified)
+    assign arb_master_oh = arb_master_id ? 2'b10 : 2'b01;
 
     // Simple round-robin state
     reg last_master;  // 0 or 1, tracks which master was served last
     
-    // Ready signals - only the selected master gets ready
-    assign a_ready_o[0] = arb_ready && arb_valid && (arb_channel == 2'b00) && (arb_master_id == 1'b0);
-    assign a_ready_o[1] = arb_ready && arb_valid && (arb_channel == 2'b00) && (arb_master_id == 1'b1);
-    assign c_ready_o[0] = arb_ready && arb_valid && (arb_channel == 2'b01) && (arb_master_id == 1'b0);
-    assign c_ready_o[1] = arb_ready && arb_valid && (arb_channel == 2'b01) && (arb_master_id == 1'b1);
+    // Ready signals - only the selected master gets ready (simplified)
+    assign a_ready_o[0] = arb_ready && arb_valid && (arb_channel == 2'b00) && !arb_master_id;
+    assign a_ready_o[1] = arb_ready && arb_valid && (arb_channel == 2'b00) && arb_master_id;
+    assign c_ready_o[0] = arb_ready && arb_valid && (arb_channel == 2'b01) && !arb_master_id;
+    assign c_ready_o[1] = arb_ready && arb_valid && (arb_channel == 2'b01) && arb_master_id;
 
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
@@ -63,12 +63,8 @@ module simple_arbiter (
                 arb_busy <= 1'b1;
                 arb_channel <= 2'b01; // Channel C
                 
-                // Round-robin for Channel C
-                if (c_valid_i[~last_master]) begin
-                    arb_master_id <= ~last_master;
-                end else begin
-                    arb_master_id <= last_master;
-                end
+                // Simple round-robin for 2 masters
+                arb_master_id <= c_valid_i[~last_master] ? ~last_master : last_master;
                 
                 // Update round-robin state when request is accepted
                 if (arb_ready) begin
@@ -81,12 +77,8 @@ module simple_arbiter (
                 arb_busy <= 1'b1;
                 arb_channel <= 2'b00; // Channel A
                 
-                // Round-robin for Channel A
-                if (a_valid_i[~last_master]) begin
-                    arb_master_id <= ~last_master;
-                end else begin
-                    arb_master_id <= last_master;
-                end
+                // Simple round-robin for 2 masters
+                arb_master_id <= a_valid_i[~last_master] ? ~last_master : last_master;
                 
                 // Update round-robin state when request is accepted
                 if (arb_ready) begin
