@@ -7,53 +7,53 @@ module simple_probe_test (
     reg rst_n;
     
     // Test addresses and data
-    parameter ADDR_A = 32'h00001000;
-    parameter DATA_PATTERN = 256'hDEADBEEFCAFEBABE0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF;
+    parameter ADDR_A = 64'h0000000000001000;
+    parameter DATA_PATTERN = 512'hDEADBEEFCAFEBABE0123456789ABCDEF0123456789ABCDEF0123456789ABCDEFDEADBEEFCAFEBABE0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF;
     
     // L1 adapter interfaces
     reg                         l1_0_request_valid;
-    reg  [31:0]                 l1_0_request_addr;
+    reg  [63:0]                 l1_0_request_addr;
     reg  [2:0]                  l1_0_request_type;
-    reg  [255:0]                l1_0_request_data;
+    reg  [511:0]                l1_0_request_data;
     reg  [2:0]                  l1_0_request_permissions;
     wire                        l1_0_request_ready;
     wire                        l1_0_data_valid;
-    wire [255:0]                l1_0_data;
+    wire [511:0]                l1_0_data;
     wire                        l1_0_data_error;
     wire                        l1_0_probe_req_valid;
-    wire [31:0]                 l1_0_probe_req_addr;
+    wire [63:0]                 l1_0_probe_req_addr;
     wire [2:0]                  l1_0_probe_req_permissions;
     reg                         l1_0_probe_ack_valid;
-    reg  [31:0]                 l1_0_probe_ack_addr;
+    reg  [63:0]                 l1_0_probe_ack_addr;
     reg  [2:0]                  l1_0_probe_ack_permissions;
-    reg  [255:0]                l1_0_probe_ack_dirty_data;
+    reg  [511:0]                l1_0_probe_ack_dirty_data;
     
     reg                         l1_1_request_valid;
-    reg  [31:0]                 l1_1_request_addr;
+    reg  [63:0]                 l1_1_request_addr;
     reg  [2:0]                  l1_1_request_type;
-    reg  [255:0]                l1_1_request_data;
+    reg  [511:0]                l1_1_request_data;
     reg  [2:0]                  l1_1_request_permissions;
     wire                        l1_1_request_ready;
     wire                        l1_1_data_valid;
-    wire [255:0]                l1_1_data;
+    wire [511:0]                l1_1_data;
     wire                        l1_1_data_error;
     wire                        l1_1_probe_req_valid;
-    wire [31:0]                 l1_1_probe_req_addr;
+    wire [63:0]                 l1_1_probe_req_addr;
     wire [2:0]                  l1_1_probe_req_permissions;
     reg                         l1_1_probe_ack_valid;
-    reg  [31:0]                 l1_1_probe_ack_addr;
+    reg  [63:0]                 l1_1_probe_ack_addr;
     reg  [2:0]                  l1_1_probe_ack_permissions;
-    reg  [255:0]                l1_1_probe_ack_dirty_data;
+    reg  [511:0]                l1_1_probe_ack_dirty_data;
     
     // L2 interface (simple memory model)
     wire                        l2_cmd_valid;
     wire [2:0]                  l2_cmd_type;
-    wire [31:0]                 l2_cmd_addr;
-    wire [255:0]                l2_cmd_data;
+    wire [63:0]                 l2_cmd_addr;
+    wire [511:0]                l2_cmd_data;
     wire [3:0]                  l2_cmd_size;
     wire                        l2_cmd_dirty;
     reg                         l2_response_valid;
-    reg  [255:0]                l2_response_data;
+    reg  [511:0]                l2_response_data;
     reg                         l2_response_error;
     
 
@@ -113,7 +113,7 @@ module simple_probe_test (
     );
     
     // Simple L2 memory model
-    reg [255:0] memory [0:1023];
+    reg [511:0] memory [0:1023];
     integer mem_idx;
     
     always @(posedge clk) begin
@@ -121,7 +121,7 @@ module simple_probe_test (
         l2_response_error <= 1'b0;
         
         if (l2_cmd_valid) begin
-            mem_idx = l2_cmd_addr[31:5]; // 32-byte aligned addressing
+            mem_idx = l2_cmd_addr[31:6]; // 64-byte aligned addressing
             case (l2_cmd_type)
                 L2_CMD_READ: begin
                     l2_response_valid <= 1'b1;
@@ -141,7 +141,7 @@ module simple_probe_test (
     // Initialize memory with pattern
     initial begin
         for (mem_idx = 0; mem_idx < 1024; mem_idx = mem_idx + 1) begin
-            memory[mem_idx] = {8{mem_idx[7:0]}} | 256'hFFFFFFFFFFFFFFFF0000000000000000;
+            memory[mem_idx] = {16{mem_idx[7:0]}} | 512'hFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF00000000000000000000000000000000;
         end
     end
     
@@ -154,7 +154,7 @@ module simple_probe_test (
                 l1_0_probe_ack_valid <= 1'b1;
                 l1_0_probe_ack_addr <= l1_0_probe_req_addr;
                 l1_0_probe_ack_permissions <= PARAM_BtoN; // Downgrade to None
-                l1_0_probe_ack_dirty_data <= 256'b0;
+                l1_0_probe_ack_dirty_data <= 512'b0;
                 $display("PROBE: L1_0 responding to probe at addr %h", l1_0_probe_req_addr);
             end else if (l1_0_probe_ack_valid) begin
                 l1_0_probe_ack_valid <= 1'b0;
@@ -171,7 +171,7 @@ module simple_probe_test (
                 l1_1_probe_ack_valid <= 1'b1;
                 l1_1_probe_ack_addr <= l1_1_probe_req_addr;
                 l1_1_probe_ack_permissions <= PARAM_BtoN; // Downgrade to None
-                l1_1_probe_ack_dirty_data <= 256'b0;
+                l1_1_probe_ack_dirty_data <= 512'b0;
                 $display("PROBE: L1_1 responding to probe at addr %h", l1_1_probe_req_addr);
             end else if (l1_1_probe_ack_valid) begin
                 l1_1_probe_ack_valid <= 1'b0;
@@ -266,15 +266,15 @@ module simple_probe_test (
             
             // Initialize all inputs
             l1_0_request_valid <= 1'b0;
-            l1_0_request_addr <= 32'h0;
+            l1_0_request_addr <= 64'h0;
             l1_0_request_type <= 3'b000;
-            l1_0_request_data <= 256'b0;
+            l1_0_request_data <= 512'b0;
             l1_0_request_permissions <= 3'b000;
             
             l1_1_request_valid <= 1'b0;
-            l1_1_request_addr <= 32'h0;
+            l1_1_request_addr <= 64'h0;
             l1_1_request_type <= 3'b000;
-            l1_1_request_data <= 256'b0;
+            l1_1_request_data <= 512'b0;
             l1_1_request_permissions <= 3'b000;
         end
         else begin
