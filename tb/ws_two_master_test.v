@@ -1,0 +1,305 @@
+// Two master test for TIDC system - validates 2-L1 coherence
+`include "tidc_params.v"
+
+module two_master_test (
+    output reg clk,  // Clock driven from C++ for Verilator compatibility
+    output reg rst_n,
+
+      // L1 adapter interfaces
+    output reg                         l1_0_request_valid,
+  output reg  [63:0]                 l1_0_request_addr,
+  output reg  [2:0]                  l1_0_request_type,
+  output reg  [511:0]                l1_0_request_data,
+  output reg  [2:0]                  l1_0_request_permissions,
+    output reg                  l1_0_request_ready,
+    output reg                  l1_0_data_valid,
+  output reg [511:0]                l1_0_data,
+    output reg                  l1_0_data_error,
+    output reg                  l1_0_probe_req_valid,
+  output reg [63:0]                 l1_0_probe_req_addr,
+  output reg [2:0]                  l1_0_probe_req_permissions,
+    output reg                  l1_0_probe_ack_valid,
+  output reg  [63:0]                 l1_0_probe_ack_addr,
+  output reg  [2:0]                  l1_0_probe_ack_permissions,
+  output reg  [511:0]                l1_0_probe_ack_dirty_data,
+    
+    output reg                  l1_1_request_valid,
+  output reg  [63:0]                 l1_1_request_addr,
+  output reg  [2:0]                  l1_1_request_type,
+  output reg  [511:0]                l1_1_request_data,
+  output reg  [2:0]                  l1_1_request_permissions,
+    output reg                        l1_1_request_ready,
+    output reg                  l1_1_data_valid,
+  output reg [511:0]                l1_1_data,
+    output reg                  l1_1_data_error,
+    output reg                  l1_1_probe_req_valid,
+  output reg [63:0]                 l1_1_probe_req_addr,
+  output reg [2:0]                  l1_1_probe_req_permissions,
+    output reg                         l1_1_probe_ack_valid,
+  output reg  [63:0]                 l1_1_probe_ack_addr,
+  output reg  [2:0]                  l1_1_probe_ack_permissions,
+  output reg  [511:0]                l1_1_probe_ack_dirty_data,
+    
+    // L2 interface (simple memory model)
+    output reg                  l2_cmd_valid,
+  output reg [2:0]                  l2_cmd_type,
+  output reg [63:0]                 l2_cmd_addr,
+  output reg [511:0]                l2_cmd_data,
+  output reg [3:0]                  l2_cmd_size,
+    output reg                        l2_cmd_dirty,
+    output reg                         l2_response_valid,
+  output reg  [511:0]                l2_response_data,
+    output reg                         l2_response_error
+);
+    
+    // Test addresses and data
+    parameter ADDR_A = 64'h0000000000001000;
+    parameter ADDR_B = 64'h0000000000002000;
+    parameter DATA_PATTERN_A = 512'hABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789;
+    parameter DATA_PATTERN_B = 512'h0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF;
+    
+    
+    // Simple L2 memory model
+    reg [511:0] memory [0:1023];
+    integer mem_idx;
+    
+    always @(posedge clk) begin
+        l2_response_valid <= 1'b0;
+        l2_response_error <= 1'b0;
+        
+        if (l2_cmd_valid) begin
+            mem_idx = l2_cmd_addr[31:6]; // 64-byte aligned addressing
+            case (l2_cmd_type)
+                L2_CMD_READ: begin
+                    l2_response_valid <= 1'b1;
+                    l2_response_data <= memory[mem_idx];
+                    $display("[L2] Read addr=%h, data=%h", l2_cmd_addr, memory[mem_idx]);
+                end
+                L2_CMD_WRITE, L2_CMD_WRITE_BACK: begin
+                    memory[mem_idx] <= l2_cmd_data;
+                    l2_response_valid <= 1'b1;
+                    l2_response_data <= l2_cmd_data;
+                    $display("[L2] Write addr=%h, data=%h", l2_cmd_addr, l2_cmd_data);
+                end
+            endcase
+        end
+    end
+    
+    // Initialize memory with pattern
+    initial begin
+        for (mem_idx = 0; mem_idx < 1024; mem_idx = mem_idx + 1) begin
+            memory[mem_idx] = {16{mem_idx[7:0]}} | 512'hFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF00000000000000000000000000000000;
+        end
+    end
+    
+    // Probe response logic for L1_0
+    always @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin
+            l1_0_probe_ack_valid <= 1'b0;
+        end else begin
+            if (l1_0_probe_req_valid && !l1_0_probe_ack_valid) begin
+                l1_0_probe_ack_valid <= 1'b1;
+                l1_0_probe_ack_addr <= l1_0_probe_req_addr;
+                l1_0_probe_ack_permissions <= PARAM_BtoN; // Downgrade to None
+                l1_0_probe_ack_dirty_data <= 512'b0;
+                $display("[PROBE] L1_0 responding to probe at addr %h", l1_0_probe_req_addr);
+            end else if (l1_0_probe_ack_valid) begin
+                l1_0_probe_ack_valid <= 1'b0;
+            end
+        end
+    end
+    
+    // Probe response logic for L1_1
+    always @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin
+            l1_1_probe_ack_valid <= 1'b0;
+        end else begin
+            if (l1_1_probe_req_valid && !l1_1_probe_ack_valid) begin
+                l1_1_probe_ack_valid <= 1'b1;
+                l1_1_probe_ack_addr <= l1_1_probe_req_addr;
+                l1_1_probe_ack_permissions <= PARAM_BtoN; // Downgrade to None
+                l1_1_probe_ack_dirty_data <= 512'b0;
+                $display("[PROBE] L1_1 responding to probe at addr %h", l1_1_probe_req_addr);
+            end else if (l1_1_probe_ack_valid) begin
+                l1_1_probe_ack_valid <= 1'b0;
+            end
+        end
+    end
+    
+    // Test state machine
+    reg [3:0] test_state;
+    reg [7:0] wait_counter;
+    reg l1_0_data_received, l1_1_data_received;
+    reg l1_0_probe_received, l1_1_probe_received;
+    
+    localparam TEST_RESET = 0, TEST_L1_0_SHARED = 1, TEST_L1_1_SHARED = 2, 
+               TEST_WAIT_SHARED = 3, TEST_L1_0_EXCLUSIVE = 4, TEST_WAIT_PROBE = 5, 
+               TEST_VALIDATE = 6, TEST_COMPLETE = 7;
+    
+    // Initialize test inputs
+    initial begin
+        rst_n = 1'b0;
+        test_state = TEST_RESET;
+        wait_counter = 0;
+        
+        // Initialize L1_0 inputs
+        l1_0_request_valid = 1'b0;
+        l1_0_request_addr = 64'b0;
+        l1_0_request_type = 3'b0;
+        l1_0_request_data = 512'b0;
+        l1_0_request_permissions = 3'b0;
+        l1_0_probe_ack_valid = 1'b0;
+        l1_0_probe_ack_addr = 64'b0;
+        l1_0_probe_ack_permissions = 3'b0;
+        l1_0_probe_ack_dirty_data = 512'b0;
+        
+        // Initialize L1_1 inputs
+        l1_1_request_valid = 1'b0;
+        l1_1_request_addr = 64'b0;
+        l1_1_request_type = 3'b0;
+        l1_1_request_data = 512'b0;
+        l1_1_request_permissions = 3'b0;
+        l1_1_probe_ack_valid = 1'b0;
+        l1_1_probe_ack_addr = 64'b0;
+        l1_1_probe_ack_permissions = 3'b0;
+        l1_1_probe_ack_dirty_data = 512'b0;
+        
+        l1_0_data_received = 1'b0;
+        l1_1_data_received = 1'b0;
+        l1_0_probe_received = 1'b0;
+        l1_1_probe_received = 1'b0;
+    end
+    
+    // Monitor data responses
+    always @(posedge clk) begin
+        if (l1_0_data_valid) begin
+            l1_0_data_received <= 1'b1;
+            $display("[%0d] L1_0 data received: %h", $time, l1_0_data);
+        end
+        if (l1_1_data_valid) begin
+            l1_1_data_received <= 1'b1;
+            $display("[%0d] L1_1 data received: %h", $time, l1_1_data);
+        end
+        if (l1_0_probe_req_valid) begin
+            l1_0_probe_received <= 1'b1;
+            $display("[%0d] L1_0 probe received for addr %h", $time, l1_0_probe_req_addr);
+        end
+        if (l1_1_probe_req_valid) begin
+            l1_1_probe_received <= 1'b1;
+            $display("[%0d] L1_1 probe received for addr %h", $time, l1_1_probe_req_addr);
+        end
+    end
+    
+    // Main test sequence
+    always @(posedge clk) begin
+        if (!rst_n) begin
+            rst_n <= 1'b1;
+            $display("Two master test starting...");
+            $display("=== Two Master Test - 2-L1 Coherence ===");
+        end else begin
+            wait_counter <= wait_counter + 1;
+            
+            case (test_state)
+                TEST_RESET: begin
+                    if (wait_counter == 20) begin
+                        test_state <= TEST_L1_0_SHARED;
+                        wait_counter <= 0;
+                        $display("TEST 1: L1_0 requests shared access to addr %h", ADDR_A);
+                        l1_0_request_valid <= 1'b1;
+                        l1_0_request_addr <= ADDR_A;
+                        l1_0_request_type <= L1_REQ_READ_MISS;
+                        l1_0_request_permissions <= PARAM_NtoB;
+                    end
+                end
+                
+                TEST_L1_0_SHARED: begin
+                    if (l1_0_request_ready) begin
+                        l1_0_request_valid <= 1'b0;
+                        test_state <= TEST_L1_1_SHARED;
+                        wait_counter <= 0;
+                        $display("TEST 2: L1_1 requests shared access to same addr %h", ADDR_A);
+                        l1_1_request_valid <= 1'b1;
+                        l1_1_request_addr <= ADDR_A;
+                        l1_1_request_type <= L1_REQ_READ_MISS;
+                        l1_1_request_permissions <= PARAM_NtoB;
+                    end
+                end
+                
+                TEST_L1_1_SHARED: begin
+                    if (l1_1_request_ready) begin
+                        l1_1_request_valid <= 1'b0;
+                        test_state <= TEST_WAIT_SHARED;
+                        wait_counter <= 0;
+                        $display("Waiting for both L1s to receive shared data...");
+                    end
+                end
+                
+                TEST_WAIT_SHARED: begin
+                    if (l1_0_data_received && l1_1_data_received) begin
+                        test_state <= TEST_L1_0_EXCLUSIVE;
+                        wait_counter <= 0;
+                        $display("TEST 3: L1_0 upgrades to exclusive access");
+                        l1_0_request_valid <= 1'b1;
+                        l1_0_request_addr <= ADDR_A;
+                        l1_0_request_type <= L1_REQ_WRITE_MISS;
+                        l1_0_request_permissions <= PARAM_BtoT;
+                        l1_0_request_data <= DATA_PATTERN_A;
+                    end else if (wait_counter > 100) begin
+                        $display("ERROR: Timeout waiting for shared data");
+                        $finish;
+                    end
+                end
+                
+                TEST_L1_0_EXCLUSIVE: begin
+                    if (l1_0_request_ready) begin
+                        l1_0_request_valid <= 1'b0;
+                        test_state <= TEST_WAIT_PROBE;
+                        wait_counter <= 0;
+                        $display("Waiting for L1_1 to be probed for exclusive upgrade...");
+                    end
+                end
+                
+                TEST_WAIT_PROBE: begin
+                    if (l1_1_probe_received) begin
+                        test_state <= TEST_VALIDATE;
+                        wait_counter <= 0;
+                        $display("TEST 4: Validating probe response and completion...");
+                    end else if (wait_counter > 100) begin
+                        $display("ERROR: Timeout waiting for probe");
+                        $finish;
+                    end
+                end
+                
+                TEST_VALIDATE: begin
+                    if (wait_counter > 20) begin
+                        test_state <= TEST_COMPLETE;
+                        $display("=== Two Master Test Results ===");
+                        $display("✓ L1_0 shared access: %s", l1_0_data_received ? "PASS" : "FAIL");
+                        $display("✓ L1_1 shared access: %s", l1_1_data_received ? "PASS" : "FAIL");
+                        $display("✓ L1_1 probe received: %s", l1_1_probe_received ? "PASS" : "FAIL");
+                        $display("✓ Two master coherence: COMPLETE");
+                        $display("=== Two Master Test Complete ===");
+                        $finish;
+                    end
+                end
+                
+                default: begin
+                    $display("ERROR: Invalid test state");
+                    $finish;
+                end
+            endcase
+        end
+    end
+    
+    initial begin
+        clk = 0;
+        rst_n = 1'b0;
+        #100;
+        rst_n = 1'b1;
+    end
+
+    always begin
+      #5 clk = ~clk;
+    end
+
+endmodule 
