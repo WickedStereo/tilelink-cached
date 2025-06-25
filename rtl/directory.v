@@ -92,17 +92,17 @@ module directory (
                 dir_presence[get_index(update_addr)] <= update_presence;
                 dir_tip_state[get_index(update_addr)] <= update_tip_state;
                 
-                $display("[DIR DEBUG] UPDATE addr=%h: state=%b, presence=%b, tip_state=%b", 
-                         update_addr, update_state, update_presence, update_tip_state);
+                // $display("[DIR DEBUG] UPDATE addr=%h: state=%b, presence=%b, tip_state=%b", 
+                //         update_addr, update_state, update_presence, update_tip_state);
             end
             
             // Debug lookup hits
             if (lookup_req) begin
                 if (lookup_hit) begin
-                    $display("[DIR DEBUG] HIT addr=%h: state=%b, presence=%b, tip_state=%b", 
-                             lookup_addr, dir_states[lookup_index], dir_presence[lookup_index], dir_tip_state[lookup_index]);
+                    // $display("[DIR DEBUG] HIT addr=%h: state=%b, presence=%b, tip_state=%b", 
+                    //         lookup_addr, dir_states[lookup_index], dir_presence[lookup_index], dir_tip_state[lookup_index]);
                 end else begin
-                    $display("[DIR DEBUG] MISS addr=%h: returning INVALID", lookup_addr);
+                    // $display("[DIR DEBUG] MISS addr=%h: returning INVALID", lookup_addr);
                 end
             end
         end

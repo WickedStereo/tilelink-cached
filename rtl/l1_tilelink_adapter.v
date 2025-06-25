@@ -274,7 +274,7 @@ module l1_tilelink_adapter (
                     if (d_valid && (d_opcode == D_OPCODE_GRANT || d_opcode == D_OPCODE_GRANT_DATA) && 
                         d_source == pending_source_id) begin
                         
-                        $display("[L1 DEBUG] Grant received: d_sink=%d, d_source=%d, pending_source=%d", d_sink, d_source, pending_source_id);
+                        // $display("[L1 DEBUG] Grant received: d_sink=%d, d_source=%d, pending_source=%d", d_sink, d_source, pending_source_id);
                         // Save the sink ID for the GrantAck
                         grant_sink <= d_sink;
                         
@@ -292,13 +292,13 @@ module l1_tilelink_adapter (
                 
                 STATE_GRANT_ACK_SEND: begin
                     // Send GrantAck on Channel E
-                    $display("[L1 DEBUG] Sending GrantAck: e_valid=1, e_sink=%d, e_ready=%b", grant_sink, e_ready);
+                    // $display("[L1 DEBUG] Sending GrantAck: e_valid=1, e_sink=%d, e_ready=%b", grant_sink, e_ready);
                     e_valid <= 1'b1;
                     e_sink <= grant_sink;
                     
                     // If the message was accepted by the network
                     if (e_ready) begin
-                        $display("[L1 DEBUG] GrantAck accepted!");
+                        // $display("[L1 DEBUG] GrantAck accepted!");
                         // Nothing to do here, next_state logic handles the transition
                     end
                 end

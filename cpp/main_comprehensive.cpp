@@ -127,58 +127,58 @@ int main(int argc, char** argv) {
         
         // Collect statistics on positive clock edge
         // Count new requests (rising edge detection)
-        if (top->l1_0_request_valid && !prev_l1_0_request_valid) {
+        if (top->l1_0_request_valid_out && !prev_l1_0_request_valid) {
             stats.l1_0_requests++;
         }
-        if (top->l1_1_request_valid && !prev_l1_1_request_valid) {
+        if (top->l1_1_request_valid_out && !prev_l1_1_request_valid) {
             stats.l1_1_requests++;
         }
         
         // Count responses
-        if (top->l1_0_data_valid && !prev_l1_0_data_valid) {
+        if (top->l1_0_data_valid_out && !prev_l1_0_data_valid) {
             stats.l1_0_responses++;
-            if (top->l1_0_data_error) {
+            if (top->l1_0_data_error_out) {
                 stats.errors_detected++;
                 std::cout << "ERROR: L1_0 data error at cycle " << cycle << "\n";
             }
         }
-        if (top->l1_1_data_valid && !prev_l1_1_data_valid) {
+        if (top->l1_1_data_valid_out && !prev_l1_1_data_valid) {
             stats.l1_1_responses++;
-            if (top->l1_1_data_error) {
+            if (top->l1_1_data_error_out) {
                 stats.errors_detected++;
                 std::cout << "ERROR: L1_1 data error at cycle " << cycle << "\n";
             }
         }
         
         // Count probes
-        if (top->l1_0_probe_req_valid && !prev_l1_0_probe_req_valid) {
+        if (top->l1_0_probe_req_valid_out && !prev_l1_0_probe_req_valid) {
             stats.l1_0_probes++;
         }
-        if (top->l1_1_probe_req_valid && !prev_l1_1_probe_req_valid) {
+        if (top->l1_1_probe_req_valid_out && !prev_l1_1_probe_req_valid) {
             stats.l1_1_probes++;
         }
         
         // Count L2 activity
-        if (top->l2_cmd_valid && !prev_l2_cmd_valid) {
+        if (top->l2_cmd_valid_out && !prev_l2_cmd_valid) {
             stats.l2_commands++;
         }
-        if (top->l2_response_valid && !prev_l2_response_valid) {
+        if (top->l2_response_valid_out && !prev_l2_response_valid) {
             stats.l2_responses++;
-            if (top->l2_response_error) {
+            if (top->l2_response_error_out) {
                 stats.errors_detected++;
                 std::cout << "ERROR: L2 response error at cycle " << cycle << "\n";
             }
         }
         
         // Update previous values for edge detection
-        prev_l1_0_request_valid = top->l1_0_request_valid;
-        prev_l1_1_request_valid = top->l1_1_request_valid;
-        prev_l1_0_data_valid = top->l1_0_data_valid;
-        prev_l1_1_data_valid = top->l1_1_data_valid;
-        prev_l1_0_probe_req_valid = top->l1_0_probe_req_valid;
-        prev_l1_1_probe_req_valid = top->l1_1_probe_req_valid;
-        prev_l2_cmd_valid = top->l2_cmd_valid;
-        prev_l2_response_valid = top->l2_response_valid;
+        prev_l1_0_request_valid = top->l1_0_request_valid_out;
+        prev_l1_1_request_valid = top->l1_1_request_valid_out;
+        prev_l1_0_data_valid = top->l1_0_data_valid_out;
+        prev_l1_1_data_valid = top->l1_1_data_valid_out;
+        prev_l1_0_probe_req_valid = top->l1_0_probe_req_valid_out;
+        prev_l1_1_probe_req_valid = top->l1_1_probe_req_valid_out;
+        prev_l2_cmd_valid = top->l2_cmd_valid_out;
+        prev_l2_response_valid = top->l2_response_valid_out;
         
         // Print progress periodically
         stats.print_progress(cycle);

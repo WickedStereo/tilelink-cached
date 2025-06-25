@@ -8,7 +8,20 @@
 `include "tidc_params.v"
 
 module comprehensive_test (
-    input wire clk  // Clock driven from C++ for Verilator compatibility
+    input wire clk,  // Clock driven from C++ for Verilator compatibility
+    
+    // Expose signals for C++ monitoring
+    output wire l1_0_request_valid_out,
+    output wire l1_1_request_valid_out,
+    output wire l1_0_data_valid_out,
+    output wire l1_1_data_valid_out,
+    output wire l1_0_data_error_out,
+    output wire l1_1_data_error_out,
+    output wire l1_0_probe_req_valid_out,
+    output wire l1_1_probe_req_valid_out,
+    output wire l2_cmd_valid_out,
+    output wire l2_response_valid_out,
+    output wire l2_response_error_out
 );
     reg rst_n;
     
@@ -76,6 +89,10 @@ module comprehensive_test (
     reg [31:0] total_cycles;
     reg [31:0] error_count;
     reg [31:0] success_count;
+    
+    // Track request acceptance
+    reg [31:0] l1_0_requests_accepted;
+    reg [31:0] l1_1_requests_accepted;
     
     // Test phase definitions
     localparam PHASE_RESET           = 5'd0;
@@ -309,15 +326,20 @@ module comprehensive_test (
         end
     end
 
-    // Test execution and monitoring
+    // Reset and test control
+    reg [7:0] reset_counter;
+    
     initial begin
         $display("=== TIDC Comprehensive Test Suite ===");
         rst_n = 1'b0;
+        reset_counter = 8'b0;
         test_phase = PHASE_RESET;
         cycle_counter = 16'b0;
         total_cycles = 32'b0;
         error_count = 32'b0;
         success_count = 32'b0;
+        l1_0_requests_accepted = 32'b0;
+        l1_1_requests_accepted = 32'b0;
         
         // Initialize inputs
         l1_0_request_valid = 1'b0;
@@ -331,10 +353,18 @@ module comprehensive_test (
         l1_1_request_type = 3'b0;
         l1_1_request_data = 512'b0;
         l1_1_request_permissions = 3'b0;
-        
-        #100; // Reset period
-        rst_n = 1'b1;
-        $display("Reset complete, starting comprehensive tests...");
+    end
+    
+    // Proper reset release synchronized to clock
+    always @(posedge clk) begin
+        if (reset_counter < 8'd15) begin
+            reset_counter <= reset_counter + 1;
+            rst_n <= 1'b0;
+        end else if (reset_counter == 8'd15) begin
+            rst_n <= 1'b1;
+            $display("Reset complete, starting comprehensive tests...");
+            reset_counter <= reset_counter + 1;
+        end
     end
     
     // Main test execution engine
@@ -776,9 +806,25 @@ module comprehensive_test (
     // Continuous monitoring and validation
     always @(posedge clk) begin
         if (rst_n) begin
+            // Monitor request acceptance
+            if (l1_0_request_valid && l1_0_request_ready) begin
+                l1_0_requests_accepted <= l1_0_requests_accepted + 1;
+                $display("[%0t] L1_0 request ACCEPTED: addr=%h, type=%d", $time, l1_0_request_addr, l1_0_request_type);
+            end
+            if (l1_1_request_valid && l1_1_request_ready) begin
+                l1_1_requests_accepted <= l1_1_requests_accepted + 1;
+                $display("[%0t] L1_1 request ACCEPTED: addr=%h, type=%d", $time, l1_1_request_addr, l1_1_request_type);
+            end
+            
             // Monitor successful transactions
-            if (l1_0_data_valid && !l1_0_data_error) success_count <= success_count + 1;
-            if (l1_1_data_valid && !l1_1_data_error) success_count <= success_count + 1;
+            if (l1_0_data_valid && !l1_0_data_error) begin
+                success_count <= success_count + 1;
+                $display("[%0t] L1_0 data RECEIVED: %h", $time, l1_0_data[63:0]);
+            end
+            if (l1_1_data_valid && !l1_1_data_error) begin
+                success_count <= success_count + 1;
+                $display("[%0t] L1_1 data RECEIVED: %h", $time, l1_1_data[63:0]);
+            end
             
             // Monitor error conditions
             if (l1_0_data_valid && l1_0_data_error) begin
@@ -788,6 +834,13 @@ module comprehensive_test (
             if (l1_1_data_valid && l1_1_data_error) begin
                 error_count <= error_count + 1;
                 $display("ERROR: L1_1 data error at cycle %d", total_cycles);
+            end
+            
+            // Debug ready signals periodically
+            if (total_cycles % 500 == 0 && total_cycles > 0) begin
+                $display("[DEBUG] Cycle %d: L1_0_ready=%b, L1_1_ready=%b, requests_accepted=%d/%d", 
+                         total_cycles, l1_0_request_ready, l1_1_request_ready, 
+                         l1_0_requests_accepted, l1_1_requests_accepted);
             end
             
             // Timeout detection per phase
@@ -805,5 +858,18 @@ module comprehensive_test (
         $dumpfile("comprehensive_test.vcd");
         $dumpvars(0, comprehensive_test);
     end
+    
+    // Assign internal signals to outputs for C++ monitoring
+    assign l1_0_request_valid_out = l1_0_request_valid;
+    assign l1_1_request_valid_out = l1_1_request_valid;
+    assign l1_0_data_valid_out = l1_0_data_valid;
+    assign l1_1_data_valid_out = l1_1_data_valid;
+    assign l1_0_data_error_out = l1_0_data_error;
+    assign l1_1_data_error_out = l1_1_data_error;
+    assign l1_0_probe_req_valid_out = l1_0_probe_req_valid;
+    assign l1_1_probe_req_valid_out = l1_1_probe_req_valid;
+    assign l2_cmd_valid_out = l2_cmd_valid;
+    assign l2_response_valid_out = l2_response_valid;
+    assign l2_response_error_out = l2_response_error;
 
 endmodule 

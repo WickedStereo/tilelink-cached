@@ -325,7 +325,7 @@ module l2_tilelink_adapter (
         if (!rst_n) begin
             prev_state <= STATE_IDLE;
         end else if (prev_state != state) begin
-            $display("[L2 DEBUG] State transition: %d -> %d", prev_state, state);
+            // $display("[L2 DEBUG] State transition: %d -> %d", prev_state, state);
             prev_state <= state;
         end
     end
@@ -447,7 +447,7 @@ module l2_tilelink_adapter (
                 l2_response_buffered <= 1'b1;
                 l2_response_data_buf <= l2_response_data;
                 l2_response_error_buf <= l2_response_error;
-                $display("[L2 DEBUG] Buffering L2 response: data=%h", l2_response_data[63:0]);
+                // $display("[L2 DEBUG] Buffering L2 response: data=%h", l2_response_data[63:0]);
             end
             // Clear buffer when returning to IDLE
             else if (next_state == STATE_IDLE) begin
@@ -455,7 +455,7 @@ module l2_tilelink_adapter (
                 pending_sink <= 4'b0; // Reset sink ID for next transaction
                 sent_sink_id <= 4'b0; // Reset sent sink ID for next transaction
                 sink_allocated <= 1'b0; // Reset allocation flag for next transaction
-                $display("[L2 DEBUG] Clearing L2 response buffer");
+                // $display("[L2 DEBUG] Clearing L2 response buffer");
             end
             
             // State-specific actions
@@ -508,11 +508,11 @@ module l2_tilelink_adapter (
                 
                 STATE_ACQUIRE_PROCESS: begin
                     // Process Acquire request based on directory state and requested permissions
-                    $display("[L2 DEBUG] ACQUIRE_PROCESS entered: dir_result_valid=%b", dir_result_valid);
+                    // $display("[L2 DEBUG] ACQUIRE_PROCESS entered: dir_result_valid=%b", dir_result_valid);
                     if (dir_result_valid) begin
                         // Debug output for probe logic
-                        $display("[L2 DEBUG] ACQUIRE_PROCESS: addr=%h, param=%b, dir_state=%b, dir_presence=%b, master_id=%d", 
-                                 pending_addr, pending_param, dir_result_state, dir_result_presence, pending_master_id);
+                        // $display("[L2 DEBUG] ACQUIRE_PROCESS: addr=%h, param=%b, dir_state=%b, dir_presence=%b, master_id=%d", 
+                        //          pending_addr, pending_param, dir_result_state, dir_result_presence, pending_master_id);
                         
                         // Determine which L1s need to be probed based on requested permissions
                         if (pending_param == PARAM_NtoT || pending_param == PARAM_BtoT) begin
@@ -521,21 +521,21 @@ module l2_tilelink_adapter (
                                 // There are sharers that need to be probed
                                 probe_sent <= dir_result_presence & ~(1 << pending_master_id); // Don't probe requesting L1
                                 probe_acked <= 2'b0;
-                                $display("[L2 DEBUG] Setting probe_sent=%b (presence=%b, exclude_master=%b)", 
-                                         dir_result_presence & ~(1 << pending_master_id), dir_result_presence, 1 << pending_master_id);
+                                // $display("[L2 DEBUG] Setting probe_sent=%b (presence=%b, exclude_master=%b)", 
+                                //          dir_result_presence & ~(1 << pending_master_id), dir_result_presence, 1 << pending_master_id);
                             end
                             else begin
                                 // No sharers, can proceed directly to L2 access
                                 probe_sent <= 2'b0;
                                 probe_acked <= 2'b0;
-                                $display("[L2 DEBUG] No probes needed, dir_state=%b", dir_result_state);
+                                // $display("[L2 DEBUG] No probes needed, dir_state=%b", dir_result_state);
                             end
                         end
                         else begin // NtoB - shared access
                             // No probes needed for shared access
                             probe_sent <= 2'b0;
                             probe_acked <= 2'b0;
-                            $display("[L2 DEBUG] Shared access, no probes needed");
+                            // $display("[L2 DEBUG] Shared access, no probes needed");
                         end
                     end
                 end
@@ -591,11 +591,11 @@ module l2_tilelink_adapter (
                 
                 STATE_GRANT_SEND: begin
                     // Simplified Grant/GrantData sending for 2 masters
-                    $display("[L2 DEBUG] GRANT_SEND: master_id=%d, l2_valid=%b, buffered=%b, sink_gnt=%b, d_0_valid=%b", 
-                             pending_master_id, l2_response_valid, l2_response_buffered, sink_id_alloc_gnt, d_0_valid);
+                    // $display("[L2 DEBUG] GRANT_SEND: master_id=%d, l2_valid=%b, buffered=%b, sink_gnt=%b, d_0_valid=%b", 
+                    //         pending_master_id, l2_response_valid, l2_response_buffered, sink_id_alloc_gnt, d_0_valid);
                     
                     if ((l2_response_valid || l2_response_buffered) && sink_id_alloc_gnt) begin
-                        $display("[L2 DEBUG] Allocating sink_id=%d, storing in pending_sink", sink_id_alloc_sink_id);
+                        // $display("[L2 DEBUG] Allocating sink_id=%d, storing in pending_sink", sink_id_alloc_sink_id);
                         pending_sink <= sink_id_alloc_sink_id;
                         sink_allocated <= 1'b1; // Mark that allocation has happened
                         
@@ -609,7 +609,7 @@ module l2_tilelink_adapter (
                             sent_sink_id <= sink_id_alloc_sink_id; // Store the sink ID we actually sent
                             d_0_data <= l2_response_buffered ? l2_response_data_buf : l2_response_data;
                             d_0_error <= l2_response_buffered ? l2_response_error_buf : l2_response_error;
-                            $display("[L2 DEBUG] Grant sent to L1_0 with sink_id=%d, pending_sink=%d", sink_id_alloc_sink_id, pending_sink);
+                            // $display("[L2 DEBUG] Grant sent to L1_0 with sink_id=%d, pending_sink=%d", sink_id_alloc_sink_id, pending_sink);
                         end else if (pending_master_id == 1 && !d_1_valid) begin
                             d_1_valid <= 1'b1;
                             d_1_opcode <= D_OPCODE_GRANT_DATA;
@@ -620,7 +620,7 @@ module l2_tilelink_adapter (
                             sent_sink_id <= sink_id_alloc_sink_id; // Store the sink ID we actually sent
                             d_1_data <= l2_response_buffered ? l2_response_data_buf : l2_response_data;
                             d_1_error <= l2_response_buffered ? l2_response_error_buf : l2_response_error;
-                            $display("[L2 DEBUG] Grant sent to L1_1 with sink_id=%d", sink_id_alloc_sink_id);
+                            // $display("[L2 DEBUG] Grant sent to L1_1 with sink_id=%d", sink_id_alloc_sink_id);
                         end
                     end
                 end
@@ -685,11 +685,11 @@ module l2_tilelink_adapter (
                 
                 STATE_GRANTACK_WAIT: begin
                     // Simplified GrantAck waiting for 2 masters
-                    $display("[L2 DEBUG] GRANTACK_WAIT: pending_master_id=%d, e_valid=%b, e_0_sink=%d, e_1_sink=%d, sent_sink_id=%d", 
-                             pending_master_id, e_valid, e_0_sink, e_1_sink, sent_sink_id);
+                    // $display("[L2 DEBUG] GRANTACK_WAIT: pending_master_id=%d, e_valid=%b, e_0_sink=%d, e_1_sink=%d, sent_sink_id=%d", 
+                    //          pending_master_id, e_valid, e_0_sink, e_1_sink, sent_sink_id);
                     if ((pending_master_id == 0 && e_valid[0] && e_0_sink == sent_sink_id) ||
                         (pending_master_id == 1 && e_valid[1] && e_1_sink == sent_sink_id)) begin
-                        $display("[L2 DEBUG] GrantAck received! Updating directory and going to IDLE");
+                        // $display("[L2 DEBUG] GrantAck received! Updating directory and going to IDLE");
                         // Update directory with new state
                         dir_update_req <= 1'b1;
                         dir_update_addr <= pending_addr;
@@ -775,24 +775,24 @@ module l2_tilelink_adapter (
             
             STATE_DIR_LOOKUP: begin
                 if (dir_lookup_valid) begin
-                    $display("[L2 DEBUG] DIR_LOOKUP complete: opcode=%b, expected_ACQUIRE=%b", 
-                             pending_opcode, A_OPCODE_ACQUIRE_BLOCK);
+                    // $display("[L2 DEBUG] DIR_LOOKUP complete: opcode=%b, expected_ACQUIRE=%b", 
+                    //          pending_opcode, A_OPCODE_ACQUIRE_BLOCK);
                     // Determine next state based on request type
                     if (pending_opcode == A_OPCODE_ACQUIRE_BLOCK) begin
                         next_state = STATE_ACQUIRE_PROCESS;
-                        $display("[L2 DEBUG] Going to ACQUIRE_PROCESS");
+                        // $display("[L2 DEBUG] Going to ACQUIRE_PROCESS");
                     end
                     else if (pending_opcode == C_OPCODE_RELEASE || pending_opcode == C_OPCODE_RELEASE_DATA) begin
                         next_state = STATE_RELEASE_PROCESS;
-                        $display("[L2 DEBUG] Going to RELEASE_PROCESS");
+                        // $display("[L2 DEBUG] Going to RELEASE_PROCESS");
                     end
                     else if (pending_opcode == A_OPCODE_GET || pending_opcode == A_OPCODE_PUT_FULL_DATA) begin
                         next_state = STATE_UNCACHED_PROCESS;
-                        $display("[L2 DEBUG] Going to UNCACHED_PROCESS");
+                        // $display("[L2 DEBUG] Going to UNCACHED_PROCESS");
                     end
                     else begin
                         next_state = STATE_IDLE; // Unknown opcode
-                        $display("[L2 DEBUG] Unknown opcode, going to IDLE");
+                        // $display("[L2 DEBUG] Unknown opcode, going to IDLE");
                     end
                 end
             end
@@ -835,11 +835,11 @@ module l2_tilelink_adapter (
             end
             
             STATE_GRANT_SEND: begin
-                $display("[L2 DEBUG] GRANT_SEND next: master_id=%d", pending_master_id);
+                // $display("[L2 DEBUG] GRANT_SEND next: master_id=%d", pending_master_id);
                 if ((pending_master_id == 0 && d_0_valid && d_0_ready) ||
                     (pending_master_id == 1 && d_1_valid && d_1_ready)) begin
                     next_state = STATE_GRANTACK_WAIT;
-                    $display("[L2 DEBUG] Going to GRANTACK_WAIT");
+                    // $display("[L2 DEBUG] Going to GRANTACK_WAIT");
                 end
             end
             
