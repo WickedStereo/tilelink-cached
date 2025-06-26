@@ -5,6 +5,7 @@ PROJECT = tidc_system
 SIMPLE_PROBE_TB_MODULE = simple_probe_test
 TWO_MASTER_TB_MODULE = two_master_test
 COMPREHENSIVE_TB_MODULE = comprehensive_test
+MODULAR_TB_MODULE = test_environment
 DUT_MODULE = tidc_top
 
 # Source files
@@ -15,6 +16,7 @@ RTL_SOURCES = $(wildcard $(RTL_DIR)/*.v)
 SIMPLE_PROBE_TB_SOURCES = $(TB_DIR)/simple_probe_test.v $(CPP_DIR)/main_simple_probe.cpp
 TWO_MASTER_TB_SOURCES = $(TB_DIR)/two_master_test.v $(CPP_DIR)/main_two_master.cpp
 COMPREHENSIVE_TB_SOURCES = $(TB_DIR)/comprehensive_test.v $(CPP_DIR)/main_comprehensive.cpp
+MODULAR_TB_SOURCES = $(TB_DIR)/test_environment.v $(TB_DIR)/stimulus.v $(TB_DIR)/monitor.v $(CPP_DIR)/main_modular_test.cpp
 
 # Build directory
 BUILD_DIR = obj_dir
@@ -28,9 +30,9 @@ VERILATOR_INCLUDES = -I$(RTL_DIR)
 CXX_FLAGS = -O3 -std=c++14
 
 # Targets
-.PHONY: all clean simple-probe-test two-master-test comprehensive-test waves lint help
+.PHONY: all clean simple-probe-test two-master-test comprehensive-test modular-test waves lint help
 
-all: comprehensive-test
+all: modular-test
 
 # Build the simple probe test executable
 $(BUILD_DIR)/V$(SIMPLE_PROBE_TB_MODULE): $(RTL_SOURCES) $(SIMPLE_PROBE_TB_SOURCES)
@@ -56,6 +58,14 @@ $(BUILD_DIR)/V$(COMPREHENSIVE_TB_MODULE): $(RTL_SOURCES) $(COMPREHENSIVE_TB_SOUR
 		$(COMPREHENSIVE_TB_SOURCES) $(RTL_SOURCES) \
 		--build -o V$(COMPREHENSIVE_TB_MODULE)
 
+# Build the modular test executable
+$(BUILD_DIR)/V$(MODULAR_TB_MODULE): $(RTL_SOURCES) $(MODULAR_TB_SOURCES)
+	@echo "Building modular test with Verilator..."
+	$(VERILATOR) $(VERILATOR_FLAGS) $(VERILATOR_INCLUDES) \
+		--top-module $(MODULAR_TB_MODULE) \
+		$(MODULAR_TB_SOURCES) $(RTL_SOURCES) \
+		--build -o V$(MODULAR_TB_MODULE)
+
 
 # Run simple probe test
 simple-probe-test: $(BUILD_DIR)/V$(SIMPLE_PROBE_TB_MODULE)
@@ -71,6 +81,11 @@ two-master-test: $(BUILD_DIR)/V$(TWO_MASTER_TB_MODULE)
 comprehensive-test: $(BUILD_DIR)/V$(COMPREHENSIVE_TB_MODULE)
 	@echo "Running comprehensive test..."
 	cd $(BUILD_DIR) && ./V$(COMPREHENSIVE_TB_MODULE)
+
+# Run modular test
+modular-test: $(BUILD_DIR)/V$(MODULAR_TB_MODULE)
+	@echo "Running modular test..."
+	cd $(BUILD_DIR) && ./V$(MODULAR_TB_MODULE)
 
 
 # View waveforms (requires GTKWave)
@@ -97,10 +112,11 @@ lint: $(RTL_SOURCES)
 # Help
 help:
 	@echo "Available targets:"
-	@echo "  all                - Build and run comprehensive test (default)"
+	@echo "  all                - Build and run modular test (default)"
 	@echo "  simple-probe-test  - Build and run simple probe test"
 	@echo "  two-master-test    - Build and run two master test"
 	@echo "  comprehensive-test - Build and run comprehensive test suite"
+	@echo "  modular-test       - Build and run modular test (Stimulus + DUT + Monitor)"
 	@echo "  waves              - Run simple probe test and open waveforms"
 	@echo "  lint               - Run lint check on RTL"
 	@echo "  clean              - Clean build files"
